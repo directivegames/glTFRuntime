@@ -1039,3 +1039,18 @@ protected:
 
 	bool MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive);
 };
+
+#if 1 // WITH_DIRECTIVE
+/** Helper class to ensure the needed materials are cooked. */
+UCLASS()
+class UglTFMaterialLoader : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TArray<class UMaterialInterface*> LoadedMaterials;
+	
+	UglTFMaterialLoader();
+};
+#endif
