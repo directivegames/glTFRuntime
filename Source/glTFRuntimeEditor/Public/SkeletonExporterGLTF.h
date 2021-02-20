@@ -4,6 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Exporters/Exporter.h"
+
+#if 1 // WITH_DIRECTIVE
+#include "Json.h"
+#endif
+
 #include "SkeletonExporterGLTF.generated.h"
 
 class FglTFExportContext
