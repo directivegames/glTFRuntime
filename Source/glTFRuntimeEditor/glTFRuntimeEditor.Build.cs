@@ -40,8 +40,13 @@ public class glTFRuntimeEditor : ModuleRules
                 "JSON",
                 "RHI",
                 "RenderCore",
-				// ... add private dependencies that you statically link with here ...	
-			}
+#if true // WITH_DIRECTIVE
+                "UnrealEd",
+                "glTFRuntime",
+                "AssetRegistry",
+#endif
+                // ... add private dependencies that you statically link with here ...	
+            }
             );
 
 
