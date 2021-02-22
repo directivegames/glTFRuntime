@@ -799,6 +799,14 @@ public:
 
 	USkeletalMesh* FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext);
 
+#if 1 // WITH_DIRECTIVE
+	const TMap<int32, UStaticMesh*>& GetLoadedStaticMeshes() const { return StaticMeshesCache; }
+	const TMap<int32, UMaterialInterface*>& GetLoadedMaterials() const { return MaterialsCache; }
+	const TMap<int32, USkeleton*>& GetLoadedSkeletons() const { return SkeletonsCache; }
+	const TMap<int32, USkeletalMesh*>& GetLoadedSkeletalMeshes() const { return SkeletalMeshesCache; }
+	const TMap<int32, UTexture2D*>& GetLoadedTextures() const { return TexturesCache; }
+#endif
+
 protected:
 	TSharedRef<FJsonObject> Root;
 

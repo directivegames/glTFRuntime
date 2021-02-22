@@ -27,6 +27,49 @@ static void SaveObject(const FString& Path, UObject* Object, const FString& Obje
 	FAssetRegistryModule::AssetCreated(Object);
 }
 
+static void SaveAssets(UglTFRuntimeAsset* Asset, const FString& Path, const FString& NodeName)
+{
+	if (!Asset)
+	{
+		return;
+	}
+
+	const auto& Parser = Asset->GetParser();
+	if (Parser)
+	{
+		const auto& Textures = Parser->GetLoadedTextures();
+		const auto& Materials = Parser->GetLoadedMaterials();
+		const auto& StaticMeshes = Parser->GetLoadedStaticMeshes();		
+		const auto& Skeletons = Parser->GetLoadedSkeletons();
+		const auto& SkeletalMeshes = Parser->GetLoadedSkeletalMeshes();
+
+		for (const auto& Itr : Textures)
+		{
+			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_Texture_%d"), *NodeName, Itr.Key));
+		}
+	
+		for (const auto& Itr : Materials)
+		{
+			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_Material_%d"), *NodeName, Itr.Key));
+		}
+
+		for (const auto& Itr : StaticMeshes)
+		{
+			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_StaticMesh_%d"), *NodeName, Itr.Key));
+		}
+
+		for (const auto& Itr : Skeletons)
+		{
+			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_Skeleton_%d"), *NodeName, Itr.Key));
+		}
+
+		for (const auto& Itr : SkeletalMeshes)
+		{
+			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_SkeletalMesh_%d"), *NodeName, Itr.Key));
+		}
+	}
+}
+
 UObject* UGLTFFactory::FactoryCreateFile(UClass* InClass, UObject* InParent, FName InName, EObjectFlags Flags, const FString& Filename,
 	const TCHAR* Parms, FFeedbackContext* Warn, bool& bOutOperationCanceled)
 {
@@ -47,12 +90,7 @@ UObject* UGLTFFactory::FactoryCreateFile(UClass* InClass, UObject* InParent, FNa
 					{
 						Loaded = SkeletalMesh;
 
-						if (auto Skeleton = SkeletalMesh->Skeleton)
-						{
-							SaveObject(ParentName, Skeleton, Node.Name + TEXT("_Skeleton"));							
-						}
-
-						SaveObject(ParentName, SkeletalMesh, Node.Name);
+						SaveAssets(Asset, ParentName, Node.Name);
 					}
 				}
 				else
@@ -61,8 +99,8 @@ UObject* UGLTFFactory::FactoryCreateFile(UClass* InClass, UObject* InParent, FNa
 					if (auto StaticMesh = Asset->LoadStaticMesh(Node.MeshIndex, StaticMeshConfig))
 					{
 						Loaded = StaticMesh;
-						
-						SaveObject(ParentName, StaticMesh, Node.Name);
+
+						SaveAssets(Asset, ParentName, Node.Name);
 					}
 				}
 			}

@@ -139,7 +139,10 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (AdvancedDisplay = "ProceduralMeshConfig", AutoCreateRefTerm = "ProceduralMeshConfig"), Category = "glTFRuntime")
 	bool LoadStaticMeshIntoProceduralMeshComponent(const int32 MeshIndex, UProceduralMeshComponent* ProceduralMeshComponent, const FglTFRuntimeProceduralMeshConfig& ProceduralMeshConfig);
 
+#if 1 // WITH_DIRECTIVE
+	const TSharedPtr<FglTFRuntimeParser>& GetParser() const { return Parser; }
+#endif
+
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
-	
 };
