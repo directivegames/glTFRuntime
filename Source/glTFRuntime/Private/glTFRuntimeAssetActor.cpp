@@ -28,11 +28,19 @@ void AglTFRuntimeAssetActor::BeginPlay()
 
 	TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
 	for (FglTFRuntimeScene& Scene : Scenes)
-	{
+	{		
+#if 1 // WITH_DIRECTIVE
+		USceneComponent* SceneComponent = NewObject<USceneComponent>(DelegateActor ? DelegateActor : this, *FString::Printf(TEXT("Scene %d"), Scene.Index));
+		SceneComponent->SetupAttachment(DelegateActor ? DelegateActor->GetRootComponent() : RootComponent);
+		SceneComponent->RegisterComponent();
+		CustomAddInstanceComponent(SceneComponent);
+#else
 		USceneComponent* SceneComponent = NewObject<USceneComponent>(this, *FString::Printf(TEXT("Scene %d"), Scene.Index));
 		SceneComponent->SetupAttachment(RootComponent);
 		SceneComponent->RegisterComponent();
 		AddInstanceComponent(SceneComponent);
+#endif
+
 		for (int32 NodeIndex : Scene.RootNodesIndices)
 		{
 			FglTFRuntimeNode Node;
@@ -56,32 +64,56 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	USceneComponent* NewComponent = nullptr;
 	if (Node.CameraIndex != INDEX_NONE)
 	{
+#if 1 // WITH_DIRECTIVE
+		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(DelegateActor ? DelegateActor : this, *Node.Name);
+		NewCameraComponent->SetupAttachment(NodeParentComponent);
+		NewCameraComponent->RegisterComponent();
+		NewCameraComponent->SetRelativeTransform(Node.Transform);
+		CustomAddInstanceComponent(NewCameraComponent);
+#else
 		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, *Node.Name);
 		NewCameraComponent->SetupAttachment(NodeParentComponent);
 		NewCameraComponent->RegisterComponent();
 		NewCameraComponent->SetRelativeTransform(Node.Transform);
 		AddInstanceComponent(NewCameraComponent);
+#endif		
 		Asset->LoadCamera(Node.CameraIndex, NewCameraComponent);
 		NewComponent = NewCameraComponent;
 
 	}
 	else if (Node.MeshIndex < 0)
 	{
+#if 1 // WITH_DIRECTIVE
+		NewComponent = NewObject<USceneComponent>(DelegateActor ? DelegateActor : this, *Node.Name);
+		NewComponent->SetupAttachment(NodeParentComponent);
+		NewComponent->RegisterComponent();
+		NewComponent->SetRelativeTransform(Node.Transform);
+		CustomAddInstanceComponent(NewComponent);
+#else
 		NewComponent = NewObject<USceneComponent>(this, *Node.Name);
 		NewComponent->SetupAttachment(NodeParentComponent);
 		NewComponent->RegisterComponent();
 		NewComponent->SetRelativeTransform(Node.Transform);
 		AddInstanceComponent(NewComponent);
+#endif		
 	}
 	else
 	{
 		if (Node.SkinIndex < 0)
 		{
+#if 1 // WITH_DIRECTIVE
+			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(DelegateActor ? DelegateActor : this, *Node.Name);
+			StaticMeshComponent->SetupAttachment(NodeParentComponent);
+			StaticMeshComponent->RegisterComponent();
+			StaticMeshComponent->SetRelativeTransform(Node.Transform);
+			CustomAddInstanceComponent(StaticMeshComponent);
+#else
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, *Node.Name);
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(StaticMeshComponent);
+#endif			
 			if (StaticMeshConfig.Outer == nullptr)
 			{
 				StaticMeshConfig.Outer = StaticMeshComponent;
@@ -105,11 +137,19 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		}
 		else
 		{
+#if 1 // WITH_DIRECTIVE
+			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(DelegateActor ? DelegateActor : this, *Node.Name);
+			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
+			SkeletalMeshComponent->RegisterComponent();
+			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
+			CustomAddInstanceComponent(SkeletalMeshComponent);
+#else
 			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, *Node.Name);
 			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(SkeletalMeshComponent);
+#endif			
 			USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
 			SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
 			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
@@ -230,3 +270,17 @@ void AglTFRuntimeAssetActor::ReceiveOnSkeletalMeshComponentCreated_Implementatio
 {
 
 }
+
+#if 1 // WITH_DIRECTIVE
+void AglTFRuntimeAssetActor::CustomAddInstanceComponent(UActorComponent* Component)
+{
+	if (DelegateActor)
+	{
+		DelegateActor->AddInstanceComponent(Component);
+	}
+	else
+	{
+		AddInstanceComponent(Component);
+	}
+}
+#endif

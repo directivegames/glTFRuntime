@@ -42,6 +42,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
 
+#if 1 // WITH_DIRECTIVE
+	// If specified, the loaded assets will be applied to the delegate actor
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
+	AActor* DelegateActor;
+#endif
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<USceneComponent*, UglTFRuntimeAnimationCurve*> CurveBasedAnimations;
 
@@ -58,4 +64,7 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
 	USceneComponent* AssetRoot;
 
+#if 1 // WITH_DIRECTIVE
+	void CustomAddInstanceComponent(UActorComponent* Component);
+#endif
 };
