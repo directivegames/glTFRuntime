@@ -27,7 +27,21 @@ static void SaveObject(const FString& Path, UObject* Object, const FString& Obje
 	FAssetRegistryModule::AssetCreated(Object);
 }
 
-static void SaveAssets(UglTFRuntimeAsset* Asset, const FString& Path, const FString& NodeName)
+template<class T>
+static void SaveObjects(const TMap<int32, T>& Objects, const FString& Path, const FString& NodeName, TArray<UObject*>& SavedObjects, const FString& ObjectType)
+{
+	for (const auto& Itr : Objects)
+	{
+		auto Object = Itr.Value;
+		if (!SavedObjects.Contains(Object))
+		{
+			SaveObject(Path, Object, FString::Printf(TEXT("%s_%s_%d"), *NodeName, *ObjectType, Itr.Key));
+			SavedObjects.Add(Object);
+		}
+	}
+}
+
+static void SaveAssets(UglTFRuntimeAsset* Asset, const FString& Path, const FString& NodeName, TArray<UObject*>& SavedObjects)
 {
 	if (!Asset)
 	{
@@ -37,36 +51,11 @@ static void SaveAssets(UglTFRuntimeAsset* Asset, const FString& Path, const FStr
 	const auto& Parser = Asset->GetParser();
 	if (Parser)
 	{
-		const auto& Textures = Parser->GetLoadedTextures();
-		const auto& Materials = Parser->GetLoadedMaterials();
-		const auto& StaticMeshes = Parser->GetLoadedStaticMeshes();		
-		const auto& Skeletons = Parser->GetLoadedSkeletons();
-		const auto& SkeletalMeshes = Parser->GetLoadedSkeletalMeshes();
-
-		for (const auto& Itr : Textures)
-		{
-			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_Texture_%d"), *NodeName, Itr.Key));
-		}
-	
-		for (const auto& Itr : Materials)
-		{
-			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_Material_%d"), *NodeName, Itr.Key));
-		}
-
-		for (const auto& Itr : StaticMeshes)
-		{
-			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_StaticMesh_%d"), *NodeName, Itr.Key));
-		}
-
-		for (const auto& Itr : Skeletons)
-		{
-			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_Skeleton_%d"), *NodeName, Itr.Key));
-		}
-
-		for (const auto& Itr : SkeletalMeshes)
-		{
-			SaveObject(Path, Itr.Value, FString::Printf(TEXT("%s_SkeletalMesh_%d"), *NodeName, Itr.Key));
-		}
+		SaveObjects(Parser->GetLoadedTextures(), Path, NodeName, SavedObjects, TEXT("Texture"));
+		SaveObjects(Parser->GetLoadedMaterials(), Path, NodeName, SavedObjects, TEXT("Material"));
+		SaveObjects(Parser->GetLoadedStaticMeshes(), Path, NodeName, SavedObjects, TEXT("StaticMesh"));
+		SaveObjects(Parser->GetLoadedSkeletons(), Path, NodeName, SavedObjects, TEXT("Skeleton"));
+		SaveObjects(Parser->GetLoadedSkeletalMeshes(), Path, NodeName, SavedObjects, TEXT("SkeletalMesh"));
 	}
 }
 
@@ -79,6 +68,7 @@ UObject* UGLTFFactory::FactoryCreateFile(UClass* InClass, UObject* InParent, FNa
 	if (auto Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(Filename, false, Config))
 	{
 		const auto Nodes = Asset->GetNodes();
+		TArray<UObject*> SavedObjects;
 		for (const auto& Node : Nodes)
 		{
 			if (Node.MeshIndex >= 0)
@@ -90,7 +80,7 @@ UObject* UGLTFFactory::FactoryCreateFile(UClass* InClass, UObject* InParent, FNa
 					{
 						Loaded = SkeletalMesh;
 
-						SaveAssets(Asset, ParentName, Node.Name);
+						SaveAssets(Asset, ParentName, Node.Name, SavedObjects);
 					}
 				}
 				else
@@ -100,7 +90,7 @@ UObject* UGLTFFactory::FactoryCreateFile(UClass* InClass, UObject* InParent, FNa
 					{
 						Loaded = StaticMesh;
 
-						SaveAssets(Asset, ParentName, Node.Name);
+						SaveAssets(Asset, ParentName, Node.Name, SavedObjects);
 					}
 				}
 			}

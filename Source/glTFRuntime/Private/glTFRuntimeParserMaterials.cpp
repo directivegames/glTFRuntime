@@ -183,7 +183,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 
 UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Public);
+#else
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
+#endif
 
 	Texture->PlatformData = new FTexturePlatformData();
 	Texture->PlatformData->SizeX = Mips[0].Width;
@@ -229,6 +233,20 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	Texture->UpdateResource();
 
+#if WITH_EDITOR // WITH_DIRECTIVE
+	{
+		ETextureSourceFormat Format = TSF_BGRA8;
+		FTextureSourceBlock Block;
+		Block.BlockX = Block.BlockY = 0;
+		Block.NumMips = 1;
+		Block.NumSlices = 1;
+		Block.SizeX = Mips[0].Width;
+		Block.SizeY = Mips[0].Height;
+		auto BlockData = Mips[0].Pixels.GetData();
+		Texture->Source.InitBlocked(&Format, &Block, 1, 1, &BlockData);
+	}	
+#endif
+
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
 	return Texture;
@@ -261,7 +279,12 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 		return nullptr;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());	
+#else
 	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+#endif
+	
 	if (!Material)
 	{
 		return nullptr;
