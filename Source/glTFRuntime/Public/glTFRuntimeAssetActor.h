@@ -43,9 +43,9 @@ public:
 	FglTFRuntimeSkeletalMeshConfig SkeletalMeshConfig;
 
 #if 1 // WITH_DIRECTIVE
-	// If specified, the loaded assets will be applied to the delegate actor
+	// If specified, newly created components will be attached to the delegate root
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
-	AActor* DelegateActor;
+	USceneComponent* DelegateRootComponent;
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -66,5 +66,6 @@ private:
 
 #if 1 // WITH_DIRECTIVE
 	void CustomAddInstanceComponent(UActorComponent* Component);
+	AActor* GetComponentOwner();
 #endif
 };
