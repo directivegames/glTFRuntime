@@ -722,6 +722,31 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 #endif
 
+#if 1 // WITH_DIRECTIVE
+	if (SkeletalMeshContext->SkeletalMeshConfig.bBuildSimpleCollision)
+	{
+		auto SkeletalMesh = SkeletalMeshContext->SkeletalMesh;
+		if (!SkeletalMesh->BodySetup)
+		{
+			SkeletalMesh->CreateBodySetup();
+		}
+
+		auto BodySetup = SkeletalMesh->BodySetup;
+
+		BodySetup->bMeshCollideAll = false;
+		BodySetup->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseSimpleAsComplex;
+		BodySetup->InvalidatePhysicsData();
+
+		FKBoxElem BoxElem;
+		BoxElem.Center = SkeletalMeshContext->BoundingBox.GetCenter();
+		BoxElem.X = SkeletalMeshContext->BoundingBox.GetExtent().X * 2.0f;
+		BoxElem.Y = SkeletalMeshContext->BoundingBox.GetExtent().Y * 2.0f;
+		BoxElem.Z = SkeletalMeshContext->BoundingBox.GetExtent().Z * 2.0f;
+		BodySetup->AggGeom.BoxElems.Add(BoxElem);
+		BodySetup->CreatePhysicsMeshes();
+	}
+#endif
+	
 	return SkeletalMeshContext->SkeletalMesh;
 }
 

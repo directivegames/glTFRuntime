@@ -6,6 +6,10 @@
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
 
+#if 1 // WITH_DIRECTIVE
+#include "RigidBodySkeletalMeshComponent.h"
+#endif
+
 // Sets default values
 AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 {
@@ -138,7 +142,15 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		else
 		{
 #if 1 // WITH_DIRECTIVE
-			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(GetComponentOwner(), *Node.Name);
+			USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
+			if (SkeletalMeshConfig.bBuildSimpleCollision)
+			{
+				SkeletalMeshComponent = NewObject<URigidBodySkeletalMeshComponent>(GetComponentOwner(), *Node.Name);
+			}
+			else
+			{
+				SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(GetComponentOwner(), *Node.Name);
+			}			
 			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
