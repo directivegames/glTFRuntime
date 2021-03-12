@@ -22,6 +22,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeError, const FString, E
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnStaticMeshCreated, UStaticMesh*, StaticMesh);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FglTFRuntimeOnSkeletalMeshCreated, USkeletalMesh*, SkeletalMesh);
 
+#if 1 // WITH_DIRECTIVE
+DECLARE_STATS_GROUP(TEXT("glTFRuntime"), STATGROUP_glTFRuntime, STATCAT_Advanced);
+#endif
+
 UENUM()
 enum class EglTFRuntimeTransformBaseType : uint8
 {

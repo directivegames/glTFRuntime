@@ -8,6 +8,10 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Modules/ModuleManager.h"
 
+#if 1 // WITH_DIRECTIVE
+DECLARE_CYCLE_STAT(TEXT("Load Material"), STAT_LoadMaterial, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("Load Texture"), STAT_LoadTexture, STATGROUP_glTFRuntime);
+#endif
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
@@ -365,6 +369,10 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 
 UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_LoadTexture);
+#endif
+
 	if (TextureIndex < 0)
 	{
 		return nullptr;
@@ -561,6 +569,10 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_LoadMaterial);
+#endif
+
 	if (Index < 0)
 		return nullptr;
 

@@ -11,8 +11,22 @@
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
+#if 1 // WITH_DIRECTIVE
+DECLARE_CYCLE_STAT(TEXT("From Data"), STAT_FromData, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("From Filename"), STAT_FromFilename, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("From String"), STAT_FromString, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("From Binary"), STAT_FromBinary, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("Load Scene"), STAT_LoadScene, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("Load Primitives"), STAT_LoadPrimitives, STATGROUP_glTFRuntime);
+#endif
+
+
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_FromFilename);
+#endif
+
 	FString TruePath = Filename;
 
 	if (LoaderConfig.bSearchContentDir)
@@ -55,6 +69,10 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_FromFilename);
+#endif
+
 	// required for Gzip;
 	TArray<uint8> UncompressedData;
 
@@ -162,6 +180,10 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_FromString);
+#endif
+
 	TSharedPtr<FJsonValue> RootValue;
 
 	TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
@@ -179,6 +201,10 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_FromBinary);
+#endif
+
 	FString JsonData;
 	TArray64<uint8> BinaryBuffer;
 
@@ -433,6 +459,9 @@ int32 FglTFRuntimeParser::GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject,
 
 bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_LoadScene);
+#endif
 	TSharedPtr<FJsonObject> JsonSceneObject = GetJsonObjectFromRootIndex("scenes", SceneIndex);
 	if (!JsonSceneObject)
 		return false;
@@ -1428,6 +1457,10 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 
 bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_LoadPrimitives);
+#endif
+
 	// get primitives
 	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
 	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))

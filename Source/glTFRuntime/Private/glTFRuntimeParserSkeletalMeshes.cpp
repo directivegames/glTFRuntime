@@ -20,6 +20,15 @@
 #include "Async/Async.h"
 #include "Animation/AnimCurveTypes.h"
 
+#if 1 // WITH_DIRECTIVE
+DECLARE_CYCLE_STAT(TEXT("Load Skeletal Mesh"), STAT_LoadSkeletalMesh, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("Create Skeletal Mesh From LODs"), STAT_CreateSkeletalMeshFromLODs, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("Finalize Skeletal Mesh With LODs"), STAT_FinalizeSkeletalMeshWithLODs, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("Build Skeletal Mesh"), STAT_BuildSkeletalMesh, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("Save LOD Imported Data"), STAT_SaveLODImportedData, STATGROUP_glTFRuntime);
+DECLARE_CYCLE_STAT(TEXT("USkeletalMesh::Build"), STAT_SkeletalMeshBuild, STATGROUP_glTFRuntime);
+#endif
+
 struct FglTFRuntimeSkeletalMeshContextFinalizer
 {
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext;
@@ -75,6 +84,10 @@ void FglTFRuntimeParser::NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& 
 
 USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_CreateSkeletalMeshFromLODs);
+#endif
+
 	if (SkeletalMeshContext->SkeletalMeshConfig.OverrideSkinIndex > INDEX_NONE)
 	{
 		SkeletalMeshContext->SkinIndex = SkeletalMeshContext->SkeletalMeshConfig.OverrideSkinIndex;
@@ -555,6 +568,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_FinalizeSkeletalMeshWithLODs);
+#endif
 
 #if !WITH_EDITOR
 	bool bHasMorphTargets = false;
@@ -564,7 +580,12 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
 #if WITH_EDITOR
-		SkeletalMeshContext->SkeletalMesh->SaveLODImportedData(LODIndex, SkeletalMeshContext->LODs[LODIndex].ImportData);
+		{
+#if 1 // WITH_DIRECTIVE
+			SCOPE_CYCLE_COUNTER(STAT_SaveLODImportedData);
+#endif
+			SkeletalMeshContext->SkeletalMesh->SaveLODImportedData(LODIndex, SkeletalMeshContext->LODs[LODIndex].ImportData);
+		}		
 #endif
 		// LOD tuning
 
@@ -633,16 +654,26 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalMeshContext->SkeletalMesh->Materials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d"), LODIndex, MatIndex));
 		}
 #if WITH_EDITOR
-		IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
-		if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshContext->SkeletalMesh, LODIndex, false))
 		{
-			return nullptr;
-		}
+#if 1 // WITH_DIRECTIVE
+			SCOPE_CYCLE_COUNTER(STAT_BuildSkeletalMesh);
+#endif
+			IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
+			if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshContext->SkeletalMesh, LODIndex, false))
+			{
+				return nullptr;
+			}
+		}		
 #endif
 	}
 
 #if WITH_EDITOR
-	SkeletalMeshContext->SkeletalMesh->Build();
+	{
+#if 1 // WITH_DIRECTIVE
+		SCOPE_CYCLE_COUNTER(STAT_SkeletalMeshBuild);
+#endif
+		SkeletalMeshContext->SkeletalMesh->Build();
+	}	
 #else
 	if (bHasMorphTargets)
 	{
@@ -752,6 +783,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_LoadSkeletalMesh);
+#endif
 
 	// first check cache
 	if (CanReadFromCache(SkeletalMeshConfig.CacheMode) && SkeletalMeshesCache.Contains(MeshIndex))
