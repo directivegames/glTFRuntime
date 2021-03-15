@@ -287,7 +287,12 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 
 	// required for building complex collisions
 #if !WITH_EDITOR
+#if 1 // WITH_DIRECTIVE
+	// the static mesh index buffer is not initialized on mobile as well!
+	if (StaticMesh->RenderData && StaticMesh->RenderData->LODResources.Num() > 0)
+#else
 	if (!bIsMobile && StaticMesh->bAllowCPUAccess && StaticMesh->RenderData && StaticMesh->RenderData->LODResources.Num() > 0)
+#endif
 	{
 		FStaticMeshLODResources& LOD = StaticMesh->RenderData->LODResources[0];
 		ENQUEUE_RENDER_COMMAND(FixIndexBufferOnCPUCommand)(
