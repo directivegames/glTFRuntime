@@ -103,6 +103,9 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	}
 	else
 	{
+#if 1 // WITH_DIRECTIVE
+		UE_LOG(LogTemp, Log, TEXT("ProcessNode: %s with transform [%s]"), *Node.Name, *Node.Transform.ToString());
+#endif
 		if (Node.SkinIndex < 0)
 		{
 #if 1 // WITH_DIRECTIVE
