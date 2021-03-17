@@ -118,10 +118,15 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(StaticMeshComponent);
 #endif			
+
+#if 0 // WITH_DIRECTIVE
+			// The loaded static mesh might be cached somewhere for re-use
+			// so we shouldn't set its outer to the static mesh component, which would prevent the latter to be garbage collected!
 			if (StaticMeshConfig.Outer == nullptr)
 			{
 				StaticMeshConfig.Outer = StaticMeshComponent;
 			}
+#endif
 			UStaticMesh* StaticMesh = Asset->LoadStaticMesh(Node.MeshIndex, StaticMeshConfig);
 			if (StaticMesh && !StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
 			{
