@@ -619,6 +619,10 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 	{
 		Collector.AddReferencedObject(SkeletalMesh);
 	}
+
+#if 1 // WITH_DIRECTIVE
+	FString GetReferencerName() const override { return TEXT("FglTFRuntimeSkeletalMeshContext"); }
+#endif
 };
 
 struct FglTFRuntimeMipMap
@@ -786,6 +790,10 @@ public:
 	bool ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes);
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
+
+#if 1 // WITH_DIRECTIVE
+	FString GetReferencerName() const override { return TEXT("FglTFRuntimeParser"); }
+#endif
 
 	bool LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
