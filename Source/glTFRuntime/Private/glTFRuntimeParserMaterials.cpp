@@ -9,6 +9,7 @@
 #include "Modules/ModuleManager.h"
 
 #if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeSettings.h"
 DECLARE_CYCLE_STAT(TEXT("Load Material"), STAT_LoadMaterial, STATGROUP_glTFRuntime);
 DECLARE_CYCLE_STAT(TEXT("Load Texture"), STAT_LoadTexture, STATGROUP_glTFRuntime);
 #endif
@@ -272,6 +273,36 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 			BaseMaterial = SpecularGlossinessMaterialsMap[RuntimeMaterial.MaterialType];
 		}
 	}
+
+#if 1 // WITH_DIRECTIVE
+	if (auto RuntimeSettings = GetDefault<UglTFRuntimeSettings>())
+	{
+		if (auto Record = RuntimeSettings->MetallicRoughnessMaterialsMap.Find(RuntimeMaterial.MaterialType))
+		{
+			if (!Record->IsNull())
+			{
+				if (auto Loaded = Record->LoadSynchronous())
+				{
+					BaseMaterial = Loaded;
+				}
+			}
+		}
+		
+		if (RuntimeMaterial.bHasSpecularFactor || RuntimeMaterial.bHasGlossinessFactor)
+		{
+			if (auto Record = RuntimeSettings->SpecularGlossinessMaterialsMap.Find(RuntimeMaterial.MaterialType))
+			{
+				if (!Record->IsNull())
+				{
+					if (auto Loaded = Record->LoadSynchronous())
+					{
+						BaseMaterial = Loaded;
+					}
+				}
+			}
+		}
+	}
+#endif
 
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
