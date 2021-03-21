@@ -391,6 +391,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const Fgl
 {
 #if 1 // WITH_DIRECTIVE
 	SCOPE_CYCLE_COUNTER(STAT_LoadStaticMesh);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadStaticMesh);
 #endif
 
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);

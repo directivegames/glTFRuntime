@@ -401,6 +401,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 {
 #if 1 // WITH_DIRECTIVE
 	SCOPE_CYCLE_COUNTER(STAT_LoadTexture);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadTexture);
 #endif
 
 	if (TextureIndex < 0)
@@ -601,6 +602,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 {
 #if 1 // WITH_DIRECTIVE
 	SCOPE_CYCLE_COUNTER(STAT_LoadMaterial);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadMaterial);
 #endif
 
 	if (Index < 0)
