@@ -18,5 +18,10 @@ DEFINE_STAT(STAT_SaveLODImportedData);
 DEFINE_STAT(STAT_SkeletalMeshBuild);
 DEFINE_STAT(STAT_LoadStaticMesh);
 
-DEFINE_STAT(STAT_LoadObjectLLM);
-
+DEFINE_STAT(STAT_LoadAssetsLLM);
+DEFINE_STAT(STAT_LoadStaticMeshLLM);
+DEFINE_STAT(STAT_LoadSkeletalMeshLLM);
+DEFINE_STAT(STAT_FinalizeSkeletalMeshLLM);
+DEFINE_STAT(STAT_LoadMaterialLLM);
+DEFINE_STAT(STAT_LoadTextureLLM);
+DEFINE_STAT(STAT_LoadPrimitivesLLM);

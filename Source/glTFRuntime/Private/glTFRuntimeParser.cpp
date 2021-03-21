@@ -66,7 +66,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 {
 #if 1 // WITH_DIRECTIVE
 	SCOPE_CYCLE_COUNTER(STAT_FromData);
-	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadObject);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAssets);
 #endif
 
 	// required for Gzip;
@@ -1455,6 +1455,7 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 {
 #if 1 // WITH_DIRECTIVE
 	SCOPE_CYCLE_COUNTER(STAT_LoadPrimitives);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadPrimitives);
 #endif
 
 	// get primitives

@@ -565,6 +565,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 {
 #if 1 // WITH_DIRECTIVE
 	SCOPE_CYCLE_COUNTER(STAT_FinalizeSkeletalMeshWithLODs);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::FinalizeSkeletalMesh);
 #endif
 
 #if !WITH_EDITOR
@@ -780,6 +781,7 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 {
 #if 1 // WITH_DIRECTIVE
 	SCOPE_CYCLE_COUNTER(STAT_LoadSkeletalMesh);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadSkeletalMesh);
 #endif
 
 	// first check cache

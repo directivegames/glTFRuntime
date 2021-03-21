@@ -31,7 +31,19 @@ DECLARE_CYCLE_STAT_EXTERN(TEXT("Load Static Mesh"), STAT_LoadStaticMesh, STATGRO
 
 enum class EglTFRuntimeLLMTag : LLM_TAG_TYPE
 {
-	LoadObject = (uint32)ELLMTag::ProjectTagStart + 10,
+	LoadAssets = (uint32)ELLMTag::ProjectTagStart + 10,
+	LoadStaticMesh,
+	LoadSkeletalMesh,
+	FinalizeSkeletalMesh,
+	LoadMaterial,
+	LoadTexture,
+	LoadPrimitives,
 };
 
-DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Object"), STAT_LoadObjectLLM, STATGROUP_LLMFULL, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Assets"), STAT_LoadAssetsLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Static Mesh"), STAT_LoadStaticMeshLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Skeletal Mesh"), STAT_LoadSkeletalMeshLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Finalize Skeletal Mesh"), STAT_FinalizeSkeletalMeshLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Material"), STAT_LoadMaterialLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Texture"), STAT_LoadTextureLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Primitives"), STAT_LoadPrimitivesLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
