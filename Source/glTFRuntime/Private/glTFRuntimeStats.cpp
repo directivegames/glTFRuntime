@@ -17,3 +17,6 @@ DEFINE_STAT(STAT_BuildSkeletalMesh);
 DEFINE_STAT(STAT_SaveLODImportedData);
 DEFINE_STAT(STAT_SkeletalMeshBuild);
 DEFINE_STAT(STAT_LoadStaticMesh);
+
+DEFINE_STAT(STAT_LoadObjectLLM);
+

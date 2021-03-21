@@ -3,6 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Stats/Stats.h"
+#include "HAL/LowLevelMemStats.h"
+
 
 DECLARE_STATS_GROUP(TEXT("glTFRuntime"), STATGROUP_glTFRuntime, STATCAT_Advanced);
 
@@ -24,3 +27,11 @@ DECLARE_CYCLE_STAT_EXTERN(TEXT("Save LOD Imported Data"), STAT_SaveLODImportedDa
 DECLARE_CYCLE_STAT_EXTERN(TEXT("USkeletalMesh::Build"), STAT_SkeletalMeshBuild, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 
 DECLARE_CYCLE_STAT_EXTERN(TEXT("Load Static Mesh"), STAT_LoadStaticMesh, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+
+
+enum class EglTFRuntimeLLMTag : LLM_TAG_TYPE
+{
+	LoadObject = (uint32)ELLMTag::ProjectTagStart + 10,
+};
+
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Object"), STAT_LoadObjectLLM, STATGROUP_LLMFULL, GLTFRUNTIME_API);

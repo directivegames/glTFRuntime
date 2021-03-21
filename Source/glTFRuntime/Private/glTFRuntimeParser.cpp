@@ -65,7 +65,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_FromFilename);
+	SCOPE_CYCLE_COUNTER(STAT_FromData);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadObject);
 #endif
 
 	// required for Gzip;
