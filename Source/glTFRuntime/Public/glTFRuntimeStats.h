@@ -38,6 +38,9 @@ enum class EglTFRuntimeLLMTag : LLM_TAG_TYPE
 	LoadMaterial,
 	LoadTexture,
 	LoadPrimitives,
+	LoadAnimation,
+	LoadMorphTarget,
+	InitMorphTarget,
 };
 
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Assets"), STAT_LoadAssetsLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
@@ -47,4 +50,7 @@ DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Finalize Skeletal Mesh"), STAT_Finaliz
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Material"), STAT_LoadMaterialLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Texture"), STAT_LoadTextureLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Primitives"), STAT_LoadPrimitivesLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Animation"), STAT_LoadAnimationLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Morph Target"), STAT_LoadMorphTargetLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Init Morph Target"), STAT_InitMorphTargetLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 #endif

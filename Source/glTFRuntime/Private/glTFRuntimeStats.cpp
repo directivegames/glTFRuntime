@@ -26,4 +26,7 @@ DEFINE_STAT(STAT_FinalizeSkeletalMeshLLM);
 DEFINE_STAT(STAT_LoadMaterialLLM);
 DEFINE_STAT(STAT_LoadTextureLLM);
 DEFINE_STAT(STAT_LoadPrimitivesLLM);
+DEFINE_STAT(STAT_LoadAnimationLLM);
+DEFINE_STAT(STAT_LoadMorphTargetLLM);
+DEFINE_STAT(STAT_InitMorphTargetLLM);
 #endif

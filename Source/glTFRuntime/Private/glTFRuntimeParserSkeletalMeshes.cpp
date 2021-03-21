@@ -602,6 +602,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		int32 BaseIndex = 0;
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex].Primitives.Num(); PrimitiveIndex++)
 		{
+#if 1 // WITH_DIRECTIVE
+			LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadMorphTarget);
+#endif
 			FglTFRuntimePrimitive& Primitive = SkeletalMeshContext->LODs[LODIndex].Primitives[PrimitiveIndex];
 
 			for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
@@ -673,6 +676,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 	if (bHasMorphTargets)
 	{
+#if 1 // WITH_DIRECTIVE
+		LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::InitMorphTarget);
+#endif
 		SkeletalMeshContext->SkeletalMesh->InitMorphTargets();
 	}
 #endif
@@ -1143,6 +1149,10 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
+
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1178,6 +1188,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * S
 
 UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
 
 	if (!SkeletalMesh)
 	{
@@ -1260,6 +1273,10 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
+
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1483,6 +1500,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
 
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
 	{

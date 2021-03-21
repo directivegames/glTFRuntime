@@ -18,6 +18,9 @@ void FglTFRuntimeModule::StartupModule()
 	LLM(FLowLevelMemTracker::Get().RegisterProjectTag((int32)EglTFRuntimeLLMTag::LoadMaterial, TEXT("glTF Load Material"), GET_STATFNAME(STAT_LoadMaterialLLM), NAME_None));
 	LLM(FLowLevelMemTracker::Get().RegisterProjectTag((int32)EglTFRuntimeLLMTag::LoadTexture, TEXT("glTF Load Texture"), GET_STATFNAME(STAT_LoadTextureLLM), NAME_None));
 	LLM(FLowLevelMemTracker::Get().RegisterProjectTag((int32)EglTFRuntimeLLMTag::LoadPrimitives, TEXT("glTF Load Primitives"), GET_STATFNAME(STAT_LoadPrimitivesLLM), NAME_None));
+	LLM(FLowLevelMemTracker::Get().RegisterProjectTag((int32)EglTFRuntimeLLMTag::LoadAnimation, TEXT("glTF Load Animation"), GET_STATFNAME(STAT_LoadAnimationLLM), NAME_None));
+	LLM(FLowLevelMemTracker::Get().RegisterProjectTag((int32)EglTFRuntimeLLMTag::LoadMorphTarget, TEXT("glTF Load Morph Target"), GET_STATFNAME(STAT_LoadMorphTargetLLM), NAME_None));
+	LLM(FLowLevelMemTracker::Get().RegisterProjectTag((int32)EglTFRuntimeLLMTag::InitMorphTarget, TEXT("glTF Init Morph Target"), GET_STATFNAME(STAT_InitMorphTargetLLM), NAME_None));
 #endif
 }
 
