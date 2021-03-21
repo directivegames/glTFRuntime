@@ -604,11 +604,18 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		{
 #if 1 // WITH_DIRECTIVE
 			LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadMorphTarget);
+			const auto& WhitelistedMorphTargetNames = SkeletalMeshContext->SkeletalMeshConfig.WhitelistedMorphTargetNames;
 #endif
 			FglTFRuntimePrimitive& Primitive = SkeletalMeshContext->LODs[LODIndex].Primitives[PrimitiveIndex];
 
 			for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
 			{
+#if 1 // WITH_DIRECTIVE
+				if (WhitelistedMorphTargetNames.Num() && !WhitelistedMorphTargetNames.Contains(MorphTargetData.Name))
+				{
+					continue;
+				}
+#endif
 				FMorphTargetLODModel MorphTargetLODModel;
 				MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
 				MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
