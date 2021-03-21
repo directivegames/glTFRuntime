@@ -10,7 +10,7 @@
 #include "PhysicsEngine/BodySetup.h"
 
 #if 1 // WITH_DIRECTIVE
-DECLARE_CYCLE_STAT(TEXT("Load Static Mesh"), STAT_LoadStaticMesh, STATGROUP_glTFRuntime);
+#include "glTFRuntimeStats.h"
 #endif
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>>& PrimitivesCache)

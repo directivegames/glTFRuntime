@@ -9,16 +9,11 @@
 #include "Misc/Compression.h"
 #include "Interfaces/IPluginManager.h"
 
-DEFINE_LOG_CATEGORY(LogGLTFRuntime);
-
 #if 1 // WITH_DIRECTIVE
-DECLARE_CYCLE_STAT(TEXT("From Data"), STAT_FromData, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("From Filename"), STAT_FromFilename, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("From String"), STAT_FromString, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("From Binary"), STAT_FromBinary, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("Load Scene"), STAT_LoadScene, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("Load Primitives"), STAT_LoadPrimitives, STATGROUP_glTFRuntime);
+#include "glTFRuntimeStats.h"
 #endif
+
+DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)

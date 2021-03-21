@@ -21,12 +21,7 @@
 #include "Animation/AnimCurveTypes.h"
 
 #if 1 // WITH_DIRECTIVE
-DECLARE_CYCLE_STAT(TEXT("Load Skeletal Mesh"), STAT_LoadSkeletalMesh, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("Create Skeletal Mesh From LODs"), STAT_CreateSkeletalMeshFromLODs, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("Finalize Skeletal Mesh With LODs"), STAT_FinalizeSkeletalMeshWithLODs, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("Build Skeletal Mesh"), STAT_BuildSkeletalMesh, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("Save LOD Imported Data"), STAT_SaveLODImportedData, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("USkeletalMesh::Build"), STAT_SkeletalMeshBuild, STATGROUP_glTFRuntime);
+#include "glTFRuntimeStats.h"
 #endif
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer

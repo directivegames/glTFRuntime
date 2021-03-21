@@ -10,8 +10,7 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeSettings.h"
-DECLARE_CYCLE_STAT(TEXT("Load Material"), STAT_LoadMaterial, STATGROUP_glTFRuntime);
-DECLARE_CYCLE_STAT(TEXT("Load Texture"), STAT_LoadTexture, STATGROUP_glTFRuntime);
+#include "glTFRuntimeStats.h"
 #endif
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
