@@ -28,7 +28,7 @@ DECLARE_CYCLE_STAT_EXTERN(TEXT("USkeletalMesh::Build"), STAT_SkeletalMeshBuild, 
 
 DECLARE_CYCLE_STAT_EXTERN(TEXT("Load Static Mesh"), STAT_LoadStaticMesh, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 
-
+#if ENABLE_LOW_LEVEL_MEM_TRACKER
 enum class EglTFRuntimeLLMTag : LLM_TAG_TYPE
 {
 	LoadAssets = (uint32)ELLMTag::ProjectTagStart + 10,
@@ -47,3 +47,4 @@ DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Finalize Skeletal Mesh"), STAT_Finaliz
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Material"), STAT_LoadMaterialLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Texture"), STAT_LoadTextureLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Primitives"), STAT_LoadPrimitivesLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+#endif
