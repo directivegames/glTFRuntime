@@ -8,6 +8,7 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "RigidBodySkeletalMeshComponent.h"
+#include "glTFRuntimeStats.h"
 #endif
 
 // Sets default values
@@ -29,6 +30,10 @@ void AglTFRuntimeAssetActor::BeginPlay()
 	{
 		return;
 	}
+
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_BeginPlay);
+#endif
 
 	TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
 	for (FglTFRuntimeScene& Scene : Scenes)
@@ -59,6 +64,9 @@ void AglTFRuntimeAssetActor::BeginPlay()
 
 void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_ProcessNode);
+#endif
 	// skip bones/joints
 	if (Asset->NodeIsBone(Node.Index))
 	{
@@ -69,6 +77,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	if (Node.CameraIndex != INDEX_NONE)
 	{
 #if 1 // WITH_DIRECTIVE
+		SCOPE_CYCLE_COUNTER(STAT_AddCameraComponent);
 		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(GetComponentOwner(), *Node.Name);
 		NewCameraComponent->SetupAttachment(NodeParentComponent);
 		NewCameraComponent->RegisterComponent();
@@ -88,6 +97,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	else if (Node.MeshIndex < 0)
 	{
 #if 1 // WITH_DIRECTIVE
+		SCOPE_CYCLE_COUNTER(STAT_AddSceneMeshComponent);
 		NewComponent = NewObject<USceneComponent>(GetComponentOwner(), *Node.Name);
 		NewComponent->SetupAttachment(NodeParentComponent);
 		NewComponent->RegisterComponent();
@@ -109,6 +119,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		if (Node.SkinIndex < 0)
 		{
 #if 1 // WITH_DIRECTIVE
+			SCOPE_CYCLE_COUNTER(STAT_AddStaticMeshComponent);
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), *Node.Name);
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			StaticMeshComponent->RegisterComponent();
@@ -150,6 +161,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		else
 		{
 #if 1 // WITH_DIRECTIVE
+			SCOPE_CYCLE_COUNTER(STAT_AddSkeletalMeshComponent);
 			USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 			if (SkeletalMeshConfig.bBuildSimpleCollision)
 			{
@@ -185,32 +197,44 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	// check for animations
 	if (!NewComponent->IsA<USkeletalMeshComponent>())
 	{
-		TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
-		TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
-		for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
+#if 1 // WITH_DIRECTIVE
+		SCOPE_CYCLE_COUNTER(STAT_LoadAnimationCurves);
+		if (bLoadCurveBasedAnimations)
+#endif
 		{
-			if (!CurveBasedAnimations.Contains(NewComponent))
+			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
+			TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
+			for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
 			{
-				CurveBasedAnimations.Add(NewComponent, ComponentAnimationCurve);
-				CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
+				if (!CurveBasedAnimations.Contains(NewComponent))
+				{
+					CurveBasedAnimations.Add(NewComponent, ComponentAnimationCurve);
+					CurveBasedAnimationsTimeTracker.Add(NewComponent, 0);
+				}
+				DiscoveredCurveAnimationsNames.Add(ComponentAnimationCurve->glTFCurveAnimationName);
+				ComponentAnimationCurvesMap.Add(ComponentAnimationCurve->glTFCurveAnimationName, ComponentAnimationCurve);
 			}
-			DiscoveredCurveAnimationsNames.Add(ComponentAnimationCurve->glTFCurveAnimationName);
-			ComponentAnimationCurvesMap.Add(ComponentAnimationCurve->glTFCurveAnimationName, ComponentAnimationCurve);
-		}
-		DiscoveredCurveAnimations.Add(NewComponent, ComponentAnimationCurvesMap);
+			DiscoveredCurveAnimations.Add(NewComponent, ComponentAnimationCurvesMap);
+		}		
 	}
 	else
 	{
-		USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
-		FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig;
-		UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
-		if (SkeletalAnimation)
+#if 1 // WITH_DIRECTIVE
+		SCOPE_CYCLE_COUNTER(STAT_LoadSkeletalAnimation);
+		if (SkeletalMeshConfig.bLoadSkeletalAnimations)
+#endif
 		{
-			SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
-			SkeletalMeshComponent->AnimationData.bSavedLooping = true;
-			SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
-			SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-		}
+			USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
+			FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig;
+			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+			if (SkeletalAnimation)
+			{
+				SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
+				SkeletalMeshComponent->AnimationData.bSavedLooping = true;
+				SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
+				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			}
+		}		
 	}
 
 	for (int32 ChildIndex : Node.ChildrenIndices)

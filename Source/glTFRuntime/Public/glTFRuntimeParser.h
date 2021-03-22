@@ -431,6 +431,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bBuildSimpleCollision = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bLoadSkeletalAnimations = true;
+
 	// If specified, only the morph targets whitelisted will be loaded
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TArray<FString> WhitelistedMorphTargetNames;

@@ -19,6 +19,16 @@ DEFINE_STAT(STAT_SkeletalMeshBuild);
 DEFINE_STAT(STAT_LoadStaticMesh);
 DEFINE_STAT(STAT_BuildTexture);
 DEFINE_STAT(STAT_BuildMaterial);
+DEFINE_STAT(STAT_BeginPlay);
+DEFINE_STAT(STAT_LoadNode);
+DEFINE_STAT(STAT_ProcessNode);
+DEFINE_STAT(STAT_AddStaticMeshComponent);
+DEFINE_STAT(STAT_AddSkeletalMeshComponent);
+DEFINE_STAT(STAT_AddCameraComponent);
+DEFINE_STAT(STAT_AddSceneMeshComponent);
+DEFINE_STAT(STAT_LoadAnimationCurves);
+DEFINE_STAT(STAT_LoadSkeletalAnimation);
+DEFINE_STAT(STAT_LoadAnimation_Internal);
 
 #if ENABLE_LOW_LEVEL_MEM_TRACKER
 DEFINE_STAT(STAT_LoadAssetsLLM);

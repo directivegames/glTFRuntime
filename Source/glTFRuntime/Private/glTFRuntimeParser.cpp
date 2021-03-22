@@ -507,6 +507,10 @@ bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 
 bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_LoadNode);
+#endif
+
 	// a bit hacky, but allows zero-copy for cached values
 	if (!bAllNodesCached)
 	{
@@ -663,6 +667,10 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_LoadAnimation_Internal);
+#endif
+
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
