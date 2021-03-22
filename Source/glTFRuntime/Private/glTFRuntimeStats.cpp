@@ -10,6 +10,12 @@ DEFINE_STAT(STAT_FromString);
 DEFINE_STAT(STAT_FromBinary);
 DEFINE_STAT(STAT_LoadScene);
 DEFINE_STAT(STAT_LoadPrimitives);
+DEFINE_STAT(STAT_LoadPrimitive);
+DEFINE_STAT(STAT_BuildFromAccessorField);
+DEFINE_STAT(STAT_GetAccessor);
+DEFINE_STAT(STAT_GetBufferView);
+DEFINE_STAT(STAT_GetBuffer);
+
 DEFINE_STAT(STAT_LoadSkeletalMesh);
 DEFINE_STAT(STAT_CreateSkeletalMeshFromLODs);
 DEFINE_STAT(STAT_FinalizeSkeletalMeshWithLODs);
