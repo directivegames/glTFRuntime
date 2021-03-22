@@ -182,11 +182,17 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 
 	TSharedPtr<FJsonValue> RootValue;
 
-	TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
-	if (!FJsonSerializer::Deserialize(JsonReader, RootValue))
 	{
-		return nullptr;
-	}
+#if 1 // WITH_DIRECTIVE
+		LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadJson);
+#endif
+
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
+		if (!FJsonSerializer::Deserialize(JsonReader, RootValue))
+		{
+			return nullptr;
+		}
+	}	
 
 	TSharedPtr<FJsonObject> JsonObject = RootValue->AsObject();
 	if (!JsonObject)
@@ -249,6 +255,9 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 
 	if (Parser && bBinaryFound)
 	{
+#if 1 // WITH_DIRECTIVE
+		LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::StoreBinaryBuffer);
+#endif
 		Parser->SetBinaryBuffer(BinaryBuffer);
 	}
 

@@ -30,6 +30,8 @@ void FglTFRuntimeModule::StartupModule()
 	RegisterTag(EglTFRuntimeLLMTag::InitMorphTarget, TEXT("glTF Init Morph Target"), GET_STATFNAME(STAT_InitMorphTargetLLM));
 	RegisterTag(EglTFRuntimeLLMTag::BuildTexture, TEXT("glTF Build Texture"), GET_STATFNAME(STAT_BuildTextureLLM));
 	RegisterTag(EglTFRuntimeLLMTag::BuildMaterial, TEXT("glTF Build Material"), GET_STATFNAME(STAT_BuildMaterialLLM));
+	RegisterTag(EglTFRuntimeLLMTag::LoadJson, TEXT("glTF Load Json"), GET_STATFNAME(STAT_LoadJsonLLM));
+	RegisterTag(EglTFRuntimeLLMTag::StoreBinaryBuffer, TEXT("glTF Store Binary Buffer"), GET_STATFNAME(STAT_StoreBinaryBufferLLM));
 #endif
 }
 

@@ -33,4 +33,6 @@ DEFINE_STAT(STAT_LoadMorphTargetLLM);
 DEFINE_STAT(STAT_InitMorphTargetLLM);
 DEFINE_STAT(STAT_BuildTextureLLM);
 DEFINE_STAT(STAT_BuildMaterialLLM);
+DEFINE_STAT(STAT_LoadJsonLLM);
+DEFINE_STAT(STAT_StoreBinaryBufferLLM);
 #endif

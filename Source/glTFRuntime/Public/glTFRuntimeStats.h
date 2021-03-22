@@ -45,6 +45,8 @@ enum class EglTFRuntimeLLMTag : LLM_TAG_TYPE
 	InitMorphTarget,
 	BuildTexture,
 	BuildMaterial,
+	LoadJson,
+	StoreBinaryBuffer,
 };
 
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Assets"), STAT_LoadAssetsLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
@@ -59,4 +61,6 @@ DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Morph Target"), STAT_LoadMorphTar
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Init Morph Target"), STAT_InitMorphTargetLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Build Texture"), STAT_BuildTextureLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Build Material"), STAT_BuildMaterialLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Load Json"), STAT_LoadJsonLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_LLM_MEMORY_STAT_EXTERN(TEXT("glTF Store Binary Buffer"), STAT_StoreBinaryBufferLLM, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 #endif
