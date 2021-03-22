@@ -1840,13 +1840,61 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	return true;
 }
 
+#if 1 // WITH_DIRECTIVE
+const TArray64<uint8>* FglTFRuntimeParser::GetBuffer(int32 Index)
+{
+	SCOPE_CYCLE_COUNTER(STAT_GetBuffer);
 
+	if (Index < 0)
+		return nullptr;
+
+	if (Index == 0 && BinaryBuffer.Num() > 0)
+	{
+		return &BinaryBuffer;
+	}
+
+	// first check cache
+	if (BuffersCache.Contains(Index))
+	{
+		return &BuffersCache[Index];
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonBuffers;
+
+	// no buffers ?
+	if (!Root->TryGetArrayField("buffers", JsonBuffers))
+	{
+		return nullptr;
+	}
+
+	if (Index >= JsonBuffers->Num())
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonBufferObject = (*JsonBuffers)[Index]->AsObject();
+	if (!JsonBufferObject)
+		return nullptr;
+
+	int64 ByteLength;
+	if (!JsonBufferObject->TryGetNumberField("byteLength", ByteLength))
+		return nullptr;
+
+	FString Uri;
+	if (!JsonBufferObject->TryGetStringField("uri", Uri))
+		return nullptr;
+
+	TArray64<uint8> Bytes;
+	if (ParseBase64Uri(Uri, Bytes))
+	{
+		return &BuffersCache.Add(Index, Bytes);
+	}
+
+	return nullptr;
+}
+#else
 bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 {
-#if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_GetBuffer);
-#endif
-
 	if (Index < 0)
 		return false;
 
@@ -1896,6 +1944,7 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 
 	return false;
 }
+#endif
 
 bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes)
 {
@@ -1959,11 +2008,20 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int6
 		return false;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	const auto WholeDataPtr = GetBuffer(BufferIndex);
+	if (!WholeDataPtr)
+	{
+		return false;
+	}
+	const auto& WholeData = *WholeDataPtr;
+#else
 	TArray64<uint8> WholeData;
 	if (!GetBuffer(BufferIndex, WholeData))
 	{
 		return false;
 	}
+#endif
 
 	int64 ByteLength;
 	if (!JsonBufferObject->TryGetNumberField("byteLength", ByteLength))
