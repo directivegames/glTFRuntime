@@ -13,6 +13,11 @@
 #if WITH_EDITOR
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
+
+#if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeStats.h"
+#endif
+
 #include "glTFRuntimeParser.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
