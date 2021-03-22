@@ -188,7 +188,11 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 #if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_BuildTexture);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildTexture);
 	UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Public);
+	UE_LOG(LogGLTFRuntime, Log, TEXT("FglTFRuntimeParser::BuildTexture: created texture of size %dx%d at index %d"), 
+		Mips[0].Width, Mips[0].Height, Mips[0].TextureIndex);
 #else
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
 #endif
@@ -258,6 +262,11 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
+#if 1 // WITH_DIRECTIVE
+	SCOPE_CYCLE_COUNTER(STAT_BuildMaterial);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildMaterial);
+#endif
+
 	UMaterialInterface* BaseMaterial = nullptr;
 
 	if (MetallicRoughnessMaterialsMap.Contains(RuntimeMaterial.MaterialType))

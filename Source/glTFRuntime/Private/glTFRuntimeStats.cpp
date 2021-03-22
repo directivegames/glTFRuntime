@@ -17,6 +17,8 @@ DEFINE_STAT(STAT_BuildSkeletalMesh);
 DEFINE_STAT(STAT_SaveLODImportedData);
 DEFINE_STAT(STAT_SkeletalMeshBuild);
 DEFINE_STAT(STAT_LoadStaticMesh);
+DEFINE_STAT(STAT_BuildTexture);
+DEFINE_STAT(STAT_BuildMaterial);
 
 #if ENABLE_LOW_LEVEL_MEM_TRACKER
 DEFINE_STAT(STAT_LoadAssetsLLM);
@@ -29,4 +31,6 @@ DEFINE_STAT(STAT_LoadPrimitivesLLM);
 DEFINE_STAT(STAT_LoadAnimationLLM);
 DEFINE_STAT(STAT_LoadMorphTargetLLM);
 DEFINE_STAT(STAT_InitMorphTargetLLM);
+DEFINE_STAT(STAT_BuildTextureLLM);
+DEFINE_STAT(STAT_BuildMaterialLLM);
 #endif
