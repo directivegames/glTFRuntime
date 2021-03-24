@@ -18,7 +18,12 @@
     {
       "Name": "glTFRuntime",
       "Type": "Runtime",
-      "LoadingPhase": "Default"      
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "RuntimeCollision",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
     },
     {
       "Name": "glTFRuntimeEditor",

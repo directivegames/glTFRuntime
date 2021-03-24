@@ -29,7 +29,7 @@ class UBodySetup;
  *	@param		InAccuracy			Value between 0 and 1, controls how accurate hull generation is
  *	@param		InMaxHullVerts		Number of verts allowed in a hull
  */
-GLTFRUNTIME_API void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector>& InVertices, const TArray<uint32>& InIndices, uint32 InHullCount, int32 InMaxHullVerts,uint32 InResolution= DEFAULT_HACD_VOXEL_RESOLUTION);
+RUNTIMECOLLISION_API void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector>& InVertices, const TArray<uint32>& InIndices, uint32 InHullCount, int32 InMaxHullVerts,uint32 InResolution= DEFAULT_HACD_VOXEL_RESOLUTION);
 
 class IDecomposeMeshToHullsAsync
 {
@@ -60,4 +60,4 @@ protected:
 };
 
 // Creates the interface to the asynchronous convex decomposition tool chain
-GLTFRUNTIME_API IDecomposeMeshToHullsAsync *CreateIDecomposeMeshToHullAsync(void);
+RUNTIMECOLLISION_API IDecomposeMeshToHullsAsync* CreateIDecomposeMeshToHullAsync(void);

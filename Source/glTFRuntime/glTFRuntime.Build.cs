@@ -67,7 +67,7 @@ public class glTFRuntime : ModuleRules
             );
 
 #if true // WITH_DIRECTIVE
-        AddEngineThirdPartyPrivateStaticDependencies(Target, "VHACD");
+        PrivateDependencyModuleNames.Add("RuntimeCollision");
 #endif
     }
 }
