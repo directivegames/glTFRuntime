@@ -228,9 +228,14 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 
 		StaticMesh->StaticMaterials.Append(StaticMaterials);
 
-		
+
 		if (bCalculateNormals || bCalculateTangents)
 		{
+#if PLATFORM_HOLOLENS && UE_BUILD_DEBUG // WITH_DIRECTIVE
+			// ComputeTangentsAndNormals is currently crashing on the HL debug build due to weird "__ppgsfailure" error
+			// Disable it for now
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Calling APIs on FStaticMeshOperations may crash the HoloLens debug build so it's disabled for now!"));
+#else
 			FStaticMeshOperations::ComputePolygonTangentsAndNormals(MeshDescription->GetMeshDescription());
 			EComputeNTBsFlags NTPBsFlags = EComputeNTBsFlags::None;
 			if (bCalculateNormals)
@@ -242,6 +247,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 				NTPBsFlags |= EComputeNTBsFlags::Tangents;
 			}
 			FStaticMeshOperations::ComputeTangentsAndNormals(MeshDescription->GetMeshDescription(), NTPBsFlags);
+#endif
 		}
 
 		MeshDescriptions.Add(MeshDescription);
