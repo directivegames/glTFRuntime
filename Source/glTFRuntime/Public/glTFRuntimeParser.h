@@ -859,6 +859,7 @@ public:
 	const TMap<int32, USkeleton*>& GetLoadedSkeletons() const { return SkeletonsCache; }
 	const TMap<int32, USkeletalMesh*>& GetLoadedSkeletalMeshes() const { return SkeletalMeshesCache; }
 	const TMap<int32, UTexture2D*>& GetLoadedTextures() const { return TexturesCache; }
+	static void AddStaticMeshComponentReference(UStaticMeshComponent* Component);
 #endif
 
 protected:
