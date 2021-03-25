@@ -35,6 +35,7 @@ DEFINE_STAT(STAT_AddSceneMeshComponent);
 DEFINE_STAT(STAT_LoadAnimationCurves);
 DEFINE_STAT(STAT_LoadSkeletalAnimation);
 DEFINE_STAT(STAT_LoadAnimation_Internal);
+DEFINE_STAT(STAT_GenerateConvexCollision);
 
 #if ENABLE_LOW_LEVEL_MEM_TRACKER
 DEFINE_STAT(STAT_LoadAssetsLLM);

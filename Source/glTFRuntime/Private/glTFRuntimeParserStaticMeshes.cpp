@@ -11,6 +11,7 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeStats.h"
+#include "RuntimeCollisionFunctionLibrary.h"
 #endif
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>>& PrimitivesCache)
@@ -342,6 +343,15 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 		SphereElem.Radius = Sphere.W;
 		StaticMesh->BodySetup->AggGeom.SphereElems.Add(SphereElem);
 	}
+
+#if 1 // WITH_DIRECTIVE
+	if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
+	{
+		SCOPE_CYCLE_COUNTER(STAT_GenerateConvexCollision);
+		const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
+		URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
+	}
+#endif
 
 	StaticMesh->BodySetup->CreatePhysicsMeshes();
 
