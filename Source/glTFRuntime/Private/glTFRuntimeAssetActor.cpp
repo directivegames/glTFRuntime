@@ -125,6 +125,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
 			CustomAddInstanceComponent(StaticMeshComponent);
+			FglTFRuntimeParser::AddStaticMeshComponentReference(StaticMeshComponent);
 #else
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, *Node.Name);
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);

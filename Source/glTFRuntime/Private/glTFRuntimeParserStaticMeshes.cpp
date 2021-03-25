@@ -11,6 +11,54 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeStats.h"
+#include "RuntimeCollisionFunctionLibrary.h"
+
+static TArray<TWeakObjectPtr<UStaticMeshComponent>> StaticMeshComponents;
+void FglTFRuntimeParser::AddStaticMeshComponentReference(UStaticMeshComponent* Component)
+{
+	check(IsInGameThread());
+	if (!Component)
+	{
+		return;
+	}
+
+	for (auto& Record : StaticMeshComponents)
+	{
+		if (!Record.IsValid())
+		{
+			Record = Component;
+			return;
+		}
+	}
+	StaticMeshComponents.Add(Component);
+}
+
+static void HandleStaticMeshCollisionCreated(UStaticMesh* StaticMesh, bool bShouldRecreatePhysicsState)
+{
+	check(IsInGameThread());
+
+	if (!StaticMesh)
+	{
+		return;
+	}
+
+	for (auto& Record : StaticMeshComponents)
+	{
+		if (!Record.IsValid())
+		{
+			continue;			
+		}
+
+		if (Record->GetStaticMesh() == StaticMesh)
+		{
+			if (bShouldRecreatePhysicsState)
+			{
+				Record->RecreatePhysicsState();
+			}
+			Record = nullptr;
+		}
+	}
+}
 #endif
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJsonObject>> JsonMeshObjects, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const TMap<TSharedRef<FJsonObject>, TArray<FglTFRuntimePrimitive>>& PrimitivesCache)
@@ -343,7 +391,35 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 		StaticMesh->BodySetup->AggGeom.SphereElems.Add(SphereElem);
 	}
 
+#if 1 // WITH_DIRECTIVE
+	auto bHasConvexCollision = false;
+	if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
+	{
+		SCOPE_CYCLE_COUNTER(STAT_GenerateConvexCollision);
+		const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
+		bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
+	}
+
+	if (bHasConvexCollision)
+	{
+		auto Callback = FOnAsyncPhysicsCookFinished::CreateLambda([MeshReference = TWeakObjectPtr<UStaticMesh>(StaticMesh)](bool bSuccess) 
+		{
+			if (!MeshReference.IsValid() || !bSuccess)
+			{
+				return;
+			}
+			HandleStaticMeshCollisionCreated(MeshReference.Get(), true);
+		});
+		StaticMesh->BodySetup->CreatePhysicsMeshesAsync(Callback);
+	}
+	else
+	{
+		StaticMesh->BodySetup->CreatePhysicsMeshes();
+		HandleStaticMeshCollisionCreated(StaticMesh, false);
+	}
+#else
 	StaticMesh->BodySetup->CreatePhysicsMeshes();
+#endif	
 
 	for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
 	{

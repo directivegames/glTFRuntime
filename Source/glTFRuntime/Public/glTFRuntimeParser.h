@@ -256,6 +256,26 @@ struct FglTFRuntimeMaterialsConfig
 	}
 };
 
+#if 1 // WITH_DIRECTIVE
+USTRUCT(BlueprintType)
+struct FConvexCollisionGenerationConfig
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bGenerateConvexCollision = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 HullCount = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxHullVerts = 16;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 HullPrecision = 100000;
+};
+#endif
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeStaticMeshConfig
 {
@@ -299,6 +319,11 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<int32, float> LODScreenSize;
+
+#if 1 // WITH_DIRECTIVE
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FConvexCollisionGenerationConfig ConvexCollisionConfig;
+#endif
 
 	FglTFRuntimeStaticMeshConfig()
 	{
@@ -834,6 +859,7 @@ public:
 	const TMap<int32, USkeleton*>& GetLoadedSkeletons() const { return SkeletonsCache; }
 	const TMap<int32, USkeletalMesh*>& GetLoadedSkeletalMeshes() const { return SkeletalMeshesCache; }
 	const TMap<int32, UTexture2D*>& GetLoadedTextures() const { return TexturesCache; }
+	static void AddStaticMeshComponentReference(UStaticMeshComponent* Component);
 #endif
 
 protected:

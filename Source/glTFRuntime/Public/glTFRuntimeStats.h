@@ -45,6 +45,7 @@ DECLARE_CYCLE_STAT_EXTERN(TEXT("Add Scene Component"), STAT_AddSceneMeshComponen
 DECLARE_CYCLE_STAT_EXTERN(TEXT("Load Animation Curves"), STAT_LoadAnimationCurves, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_CYCLE_STAT_EXTERN(TEXT("Load Skeletal Animation"), STAT_LoadSkeletalAnimation, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 DECLARE_CYCLE_STAT_EXTERN(TEXT("LoadAnimation_Internal"), STAT_LoadAnimation_Internal, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
+DECLARE_CYCLE_STAT_EXTERN(TEXT("Generate Convex Collision"), STAT_GenerateConvexCollision, STATGROUP_glTFRuntime, GLTFRUNTIME_API);
 
 #if ENABLE_LOW_LEVEL_MEM_TRACKER
 enum class EglTFRuntimeLLMTag : LLM_TAG_TYPE

@@ -65,5 +65,9 @@ public class glTFRuntime : ModuleRules
 				// ... add any modules that your module loads dynamically here ...
 			}
             );
+
+#if true // WITH_DIRECTIVE
+        PrivateDependencyModuleNames.Add("RuntimeCollision");
+#endif
     }
 }
