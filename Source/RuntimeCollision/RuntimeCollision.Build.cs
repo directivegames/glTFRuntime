@@ -20,6 +20,7 @@ public class RuntimeCollision : ModuleRules
 
         if (Target.Platform == UnrealTargetPlatform.Win64 || 
             Target.Platform == UnrealTargetPlatform.Mac ||
+            Target.Platform == UnrealTargetPlatform.HoloLens ||
             Target.IsInPlatformGroup(UnrealPlatformGroup.Unix))
         {
             PrivateDefinitions.Add("WITH_VHACD=1");
