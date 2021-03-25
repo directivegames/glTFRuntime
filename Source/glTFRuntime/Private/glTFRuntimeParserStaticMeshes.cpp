@@ -345,15 +345,26 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	}
 
 #if 1 // WITH_DIRECTIVE
+	auto bHasConvexCollision = false;
 	if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GenerateConvexCollision);
 		const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
-		URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
+		bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
 	}
-#endif
 
+	if (bHasConvexCollision)
+	{
+		FOnAsyncPhysicsCookFinished Callback;
+		StaticMesh->BodySetup->CreatePhysicsMeshesAsync(Callback);
+	}
+	else
+	{
+		StaticMesh->BodySetup->CreatePhysicsMeshes();
+	}
+#else
 	StaticMesh->BodySetup->CreatePhysicsMeshes();
+#endif	
 
 	for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
 	{
