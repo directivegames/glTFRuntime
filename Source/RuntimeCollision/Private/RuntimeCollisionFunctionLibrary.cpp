@@ -9,19 +9,27 @@
 bool URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(UStaticMesh* StaticMesh, int32 HullCount, int32 MaxHullVerts, int32 HullPrecision)
 {
 #if WITH_VHACD
-	// Check we have a valid StaticMesh
-	if (!StaticMesh || !StaticMesh->IsMeshDescriptionValid(0))
+	if (!StaticMesh)
 	{
 		return false;
 	}
 
+#if WITH_EDITORONLY_DATA
+	if (!StaticMesh->IsMeshDescriptionValid(0))
+	{
+		return false;
+	}
+#endif
+
 	TRACE_CPUPROFILER_EVENT_SCOPE(GenerateConvexCollision)
 
+#if WITH_EDITOR
 	// If RenderData has not been computed yet, do it
 	if (!StaticMesh->RenderData)
 	{
 		StaticMesh->CacheDerivedData();
 	}
+#endif
 
 	const FStaticMeshLODResources& LODModel = StaticMesh->RenderData->LODResources[0];
 
@@ -73,7 +81,9 @@ bool URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(USta
 	// Run actual util to do the work (if we have some valid input)
 	DecomposeMeshToHulls(BodySetup, Verts, CollidingIndices, HullCount, MaxHullVerts, HullPrecision);
 
+#if WITH_EDITORONLY_DATA
 	StaticMesh->bCustomizedCollision = true;	//mark the static mesh for collision customization
+#endif
 
 	return true;
 #else
