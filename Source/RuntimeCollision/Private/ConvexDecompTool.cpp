@@ -17,6 +17,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogConvexDecompTool, Log, All);
 
+#if WITH_VHACD
 using namespace VHACD;
 
 class FVHACDProgressCallback : public IVHACD::IUserCallback
@@ -478,3 +479,16 @@ IDecomposeMeshToHullsAsync *CreateIDecomposeMeshToHullAsync(void)
 	FDecomposeMeshToHullsAsyncImpl *d = new FDecomposeMeshToHullsAsyncImpl;
 	return static_cast<IDecomposeMeshToHullsAsync *>(d);
 }
+
+#else // WITH_VHACD
+
+void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector>& InVertices, const TArray<uint32>& InIndices, uint32 InHullCount, int32 InMaxHullVerts, uint32 InResolution)
+{
+}
+
+IDecomposeMeshToHullsAsync* CreateIDecomposeMeshToHullAsync(void)
+{
+	return nullptr;
+}
+
+#endif // WITH_VHACD
