@@ -32,7 +32,7 @@ void AglTFRuntimeAssetActor::BeginPlay()
 	}
 
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_BeginPlay);
+	TRACE_CPUPROFILER_EVENT_SCOPE(AglTFRuntimeAssetActor::BeginPlay);
 #endif
 
 	TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
@@ -65,7 +65,7 @@ void AglTFRuntimeAssetActor::BeginPlay()
 void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, FglTFRuntimeNode& Node)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_ProcessNode);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::ProcessNode);
 #endif
 	// skip bones/joints
 	if (Asset->NodeIsBone(Node.Index))
@@ -77,7 +77,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	if (Node.CameraIndex != INDEX_NONE)
 	{
 #if 1 // WITH_DIRECTIVE
-		SCOPE_CYCLE_COUNTER(STAT_AddCameraComponent);
+		TRACE_CPUPROFILER_EVENT_SCOPE(AddCameraComponent);
 		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(GetComponentOwner(), *Node.Name);
 		NewCameraComponent->SetupAttachment(NodeParentComponent);
 		NewCameraComponent->RegisterComponent();
@@ -97,7 +97,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	else if (Node.MeshIndex < 0)
 	{
 #if 1 // WITH_DIRECTIVE
-		SCOPE_CYCLE_COUNTER(STAT_AddSceneMeshComponent);
+		TRACE_CPUPROFILER_EVENT_SCOPE(AddSceneComponent);
 		NewComponent = NewObject<USceneComponent>(GetComponentOwner(), *Node.Name);
 		NewComponent->SetupAttachment(NodeParentComponent);
 		NewComponent->RegisterComponent();
@@ -119,7 +119,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		if (Node.SkinIndex < 0)
 		{
 #if 1 // WITH_DIRECTIVE
-			SCOPE_CYCLE_COUNTER(STAT_AddStaticMeshComponent);
+			TRACE_CPUPROFILER_EVENT_SCOPE(AddStaticMeshComponent);
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), *Node.Name);
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			StaticMeshComponent->RegisterComponent();
@@ -162,7 +162,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 		else
 		{
 #if 1 // WITH_DIRECTIVE
-			SCOPE_CYCLE_COUNTER(STAT_AddSkeletalMeshComponent);
+			TRACE_CPUPROFILER_EVENT_SCOPE(AddSkeletalMeshComponent);
 			USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 			if (SkeletalMeshConfig.bBuildSimpleCollision)
 			{
@@ -199,7 +199,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	if (!NewComponent->IsA<USkeletalMeshComponent>())
 	{
 #if 1 // WITH_DIRECTIVE
-		SCOPE_CYCLE_COUNTER(STAT_LoadAnimationCurves);
+		TRACE_CPUPROFILER_EVENT_SCOPE(LoadAnimationCurves);
 		if (bLoadCurveBasedAnimations)
 #endif
 		{
@@ -221,7 +221,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, F
 	else
 	{
 #if 1 // WITH_DIRECTIVE
-		SCOPE_CYCLE_COUNTER(STAT_LoadSkeletalAnimation);
+		TRACE_CPUPROFILER_EVENT_SCOPE(LoadSkeletalAnimations);
 		if (SkeletalMeshConfig.bLoadSkeletalAnimations)
 #endif
 		{

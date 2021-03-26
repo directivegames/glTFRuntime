@@ -394,8 +394,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 #if 1 // WITH_DIRECTIVE
 	auto bHasConvexCollision = false;
 	if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
-	{
-		SCOPE_CYCLE_COUNTER(STAT_GenerateConvexCollision);
+	{		
 		const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
 		bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
 	}
@@ -472,7 +471,7 @@ bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, co
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadStaticMesh);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadStaticMesh);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadStaticMesh);
 #endif
 

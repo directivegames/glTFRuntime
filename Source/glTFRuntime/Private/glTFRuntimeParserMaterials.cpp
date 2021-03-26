@@ -188,7 +188,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(TSharedRef<FJsonOb
 UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_BuildTexture);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildTexture);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildTexture);
 	UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Public);
 	UE_LOG(LogGLTFRuntime, Log, TEXT("FglTFRuntimeParser::BuildTexture: created texture of size %dx%d at index %d"), 
@@ -263,7 +263,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_BuildMaterial);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildMaterial);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildMaterial);
 #endif
 
@@ -409,7 +409,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const FglTFRuntimeMaterial
 UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadTexture);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadTexture);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadTexture);
 #endif
 
@@ -610,7 +610,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadMaterial);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadMaterial);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadMaterial);
 #endif
 

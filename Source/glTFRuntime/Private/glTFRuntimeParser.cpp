@@ -19,7 +19,7 @@ DEFINE_LOG_CATEGORY(LogGLTFRuntime);
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_FromFilename);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromFilename);
 #endif
 
 	FString TruePath = Filename;
@@ -65,7 +65,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_FromData);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromData);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAssets);
 #endif
 
@@ -177,7 +177,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_FromString);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromString);
 #endif
 
 	TSharedPtr<FJsonValue> RootValue;
@@ -204,7 +204,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_FromBinary);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromBinary);
 #endif
 
 	FString JsonData;
@@ -465,8 +465,9 @@ int32 FglTFRuntimeParser::GetJsonObjectIndex(TSharedRef<FJsonObject> JsonObject,
 bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadScene);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadScene);
 #endif
+	
 	TSharedPtr<FJsonObject> JsonSceneObject = GetJsonObjectFromRootIndex("scenes", SceneIndex);
 	if (!JsonSceneObject)
 		return false;
@@ -508,7 +509,7 @@ bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadNode);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNode);
 #endif
 
 	// a bit hacky, but allows zero-copy for cached values
@@ -668,7 +669,7 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadAnimation_Internal);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadAnimation_Internal);
 #endif
 
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
@@ -1471,7 +1472,7 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadPrimitives);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadPrimitives);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadPrimitives);
 #endif
 
@@ -1578,7 +1579,7 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadPrimitive);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadPrimitive);
 #endif
 
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
@@ -1843,7 +1844,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 #if 1 // WITH_DIRECTIVE
 const TArray64<uint8>* FglTFRuntimeParser::GetBuffer(int32 Index)
 {
-	SCOPE_CYCLE_COUNTER(STAT_GetBuffer);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::GetBuffer);
 
 	if (Index < 0)
 		return nullptr;
@@ -1974,7 +1975,7 @@ bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Byt
 bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int64& Stride)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_GetBufferView);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::GetBufferView);
 #endif
 
 	if (Index < 0)
@@ -2052,7 +2053,7 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int6
 bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, TArray64<uint8>& Bytes)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_GetAccessor);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::GetAccessor);
 #endif
 
 	TSharedPtr<FJsonObject> JsonAccessorObject = GetJsonObjectFromRootIndex("accessors", Index);

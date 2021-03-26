@@ -933,7 +933,7 @@ protected:
 	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const bool bNormalized, Callback Filter)
 	{
 #if 1 // WITH_DIRECTIVE
-		SCOPE_CYCLE_COUNTER(STAT_BuildFromAccessorField);
+		TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildFromAccessorField);
 #endif
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))

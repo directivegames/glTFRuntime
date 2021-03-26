@@ -8,6 +8,8 @@
 
 bool URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(UStaticMesh* StaticMesh, int32 HullCount, int32 MaxHullVerts, int32 HullPrecision)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh);
+
 #if WITH_VHACD
 	if (!StaticMesh)
 	{

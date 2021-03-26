@@ -80,7 +80,7 @@ void FglTFRuntimeParser::NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& 
 USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_CreateSkeletalMeshFromLODs);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::CreateSkeletalMeshFromLODs);
 #endif
 
 	if (SkeletalMeshContext->SkeletalMeshConfig.OverrideSkinIndex > INDEX_NONE)
@@ -564,7 +564,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_FinalizeSkeletalMeshWithLODs);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::FinalizeSkeletalMesh);
 #endif
 
@@ -578,7 +578,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if WITH_EDITOR
 		{
 #if 1 // WITH_DIRECTIVE
-			SCOPE_CYCLE_COUNTER(STAT_SaveLODImportedData);
+			TRACE_CPUPROFILER_EVENT_SCOPE(SaveLODImportedData);
 #endif
 			SkeletalMeshContext->SkeletalMesh->SaveLODImportedData(LODIndex, SkeletalMeshContext->LODs[LODIndex].ImportData);
 		}		
@@ -662,7 +662,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if WITH_EDITOR
 		{
 #if 1 // WITH_DIRECTIVE
-			SCOPE_CYCLE_COUNTER(STAT_BuildSkeletalMesh);
+			TRACE_CPUPROFILER_EVENT_SCOPE(BuildSkeletalMesh);
 #endif
 			IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
 			if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshContext->SkeletalMesh, LODIndex, false))
@@ -676,7 +676,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if WITH_EDITOR
 	{
 #if 1 // WITH_DIRECTIVE
-		SCOPE_CYCLE_COUNTER(STAT_SkeletalMeshBuild);
+		TRACE_CPUPROFILER_EVENT_SCOPE(BuildSkeletalMesh);
 #endif
 		SkeletalMeshContext->SkeletalMesh->Build();
 	}	
@@ -793,7 +793,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
 #if 1 // WITH_DIRECTIVE
-	SCOPE_CYCLE_COUNTER(STAT_LoadSkeletalMesh);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadSkeletalMesh);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadSkeletalMesh);
 #endif
 
