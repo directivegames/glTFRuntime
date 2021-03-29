@@ -395,13 +395,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 	auto bHasConvexCollision = false;
 	if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
 	{		
-		const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
-		bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
-	}
-
-	if (bHasConvexCollision)
-	{
-		auto Callback = FOnAsyncPhysicsCookFinished::CreateLambda([MeshReference = TWeakObjectPtr<UStaticMesh>(StaticMesh)](bool bSuccess) 
+		auto OnCookFinished = FOnAsyncPhysicsCookFinished::CreateLambda([MeshReference = TWeakObjectPtr<UStaticMesh>(StaticMesh)](bool bSuccess)
 		{
 			if (!MeshReference.IsValid() || !bSuccess)
 			{
@@ -409,9 +403,38 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TArray<TSharedRef<FJson
 			}
 			HandleStaticMeshCollisionCreated(MeshReference.Get(), true);
 		});
-		StaticMesh->BodySetup->CreatePhysicsMeshesAsync(Callback);
+
+		const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
+		if (Config.bUseAsyncGeneration)
+		{
+			auto OnCollisionGenerated = FOnConvexCollisionGenerationFinished::CreateLambda([MeshReference = TWeakObjectPtr<UStaticMesh>(StaticMesh), OnCookFinished]()
+			{
+				if (!MeshReference.IsValid())
+				{
+					return;
+				}
+
+				if (MeshReference->BodySetup)
+				{
+					MeshReference->BodySetup->CreatePhysicsMeshesAsync(OnCookFinished);
+				}
+			});
+			if (FAsyncConvexCollisionGenerator::GenerateCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision, OnCollisionGenerated))
+			{
+				bHasConvexCollision = true;
+			}
+		}
+		else
+		{
+			if (URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision))
+			{
+				bHasConvexCollision = true;
+				StaticMesh->BodySetup->CreatePhysicsMeshesAsync(OnCookFinished);
+			}
+		}
 	}
-	else
+
+	if (!bHasConvexCollision)
 	{
 		StaticMesh->BodySetup->CreatePhysicsMeshes();
 		HandleStaticMeshCollisionCreated(StaticMesh, false);

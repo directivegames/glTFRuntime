@@ -15,3 +15,5 @@ void FRuntimeCollisionModule::ShutdownModule()
 #undef LOCTEXT_NAMESPACE
 	
 IMPLEMENT_MODULE(FRuntimeCollisionModule, RuntimeCollision)
+
+DEFINE_LOG_CATEGORY(LogRuntimeCollision);

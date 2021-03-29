@@ -5,8 +5,8 @@
 =============================================================================*/
 
 #include "ConvexDecompTool.h"
+#include "RuntimeCollision.h"
 
-#include "Misc/FeedbackContext.h"
 #include "PhysicsEngine/ConvexElem.h"
 
 #include "ThirdParty/VHACD/public/VHACD.h"
@@ -19,22 +19,6 @@ DEFINE_LOG_CATEGORY_STATIC(LogConvexDecompTool, Log, All);
 
 #if WITH_VHACD
 using namespace VHACD;
-
-class FVHACDProgressCallback : public IVHACD::IUserCallback
-{
-public:
-	FVHACDProgressCallback(void) {}
-	~FVHACDProgressCallback() {};
-
-	void Update(const double overallProgress, const double stageProgress, const double operationProgress, const char * const stage,	const char * const    operation)
-	{
-		if (IsInGameThread())
-		{
-			FString StatusString = FString::Printf(TEXT("Processing [%s]..."), ANSI_TO_TCHAR(stage));
-			GWarn->StatusUpdate(stageProgress*10.f, 1000, FText::FromString(StatusString));
-		}
-	};
-};
 
 //#define DEBUG_VHACD
 #ifdef DEBUG_VHACD
@@ -145,6 +129,8 @@ static void InitParameters(IVHACD::Parameters &VHACD_Params, uint32 InHullCount,
 void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector>& InVertices, const TArray<uint32>& InIndices, uint32 InHullCount, int32 InMaxHullVerts,uint32 InResolution)
 {
 	check(InBodySetup != NULL);
+	
+	const auto BeginTime = FPlatformTime::Seconds();
 
 	bool bSuccess = false;
 
@@ -166,17 +152,9 @@ void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector>& InVert
 	btAlignedAllocSetCustom(btAllocImpl, btFreeImpl);
 	btAlignedAllocSetCustomAligned(btAlignedAllocImpl, btAlignedFreeImpl);
 
-	FVHACDProgressCallback VHACD_Callback;
 	IVHACD::Parameters VHACD_Params;
 
 	InitParameters(VHACD_Params, InHullCount, InMaxHullVerts,InResolution);
-
-	VHACD_Params.m_callback = &VHACD_Callback;		// callback interface for message/status updates
-
-	if (IsInGameThread())
-	{
-		GWarn->BeginSlowTask(NSLOCTEXT("ConvexDecompTool", "BeginCreatingCollisionTask", "Creating Collision"), true, false);
-	}
 
 	IVHACD* InterfaceVHACD = CreateVHACD();
 
@@ -186,11 +164,6 @@ void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector>& InVert
 	const unsigned int NumTris = InIndices.Num() / 3;
 
 	bSuccess = InterfaceVHACD->Compute(Verts, NumVerts, Tris, NumTris, VHACD_Params);
-
-	if (IsInGameThread())
-	{
-		GWarn->EndSlowTask();
-	}
 
 	if(bSuccess)
 	{
@@ -225,6 +198,10 @@ void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector>& InVert
 
 	InterfaceVHACD->Clean();
 	InterfaceVHACD->Release();
+
+	const auto ElapsedTime = FPlatformTime::Seconds() - BeginTime;
+	UE_LOG(LogRuntimeCollision, Log, TEXT("DecomposeMeshToHulls took %.2f ms, vertices: %d, indices: %d, hull count: %d, max hull vertices: %d, resolution: %d"),
+		(float)ElapsedTime * 1000.f, InVertices.Num(), InIndices.Num(), InHullCount, InMaxHullVerts, InResolution);
 }
 
 class FDecomposeMeshToHullsAsyncImpl : public IDecomposeMeshToHullsAsync, public IVHACD::IUserCallback

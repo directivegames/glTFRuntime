@@ -266,6 +266,9 @@ struct FConvexCollisionGenerationConfig
 	bool bGenerateConvexCollision = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bUseAsyncGeneration = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	int32 HullCount = 4;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
