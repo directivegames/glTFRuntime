@@ -40,7 +40,7 @@ FMatrix FglTFExportContextSkeleton::BuildBoneFullMatrix(const FReferenceSkeleton
 	return Transform.ToMatrixWithScale();
 }
 
-void FglTFExportContextSkeleton::GenerateSkeleton(USkeleton* Skeleton)
+void FglTFExportContextSkeleton::GenerateSkeleton(const USkeleton* Skeleton)
 {
 	const FReferenceSkeleton& SkeletonRef = Skeleton->GetReferenceSkeleton();
 

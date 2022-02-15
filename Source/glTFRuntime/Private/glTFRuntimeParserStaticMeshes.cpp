@@ -21,7 +21,7 @@ FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRun
 #endif
 
 #if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
-	StaticMesh->SetIsBuiltAtRuntime(true);
+	// StaticMesh->SetIsBuiltAtRuntime(true);
 #endif
 	StaticMesh->NeverStream = true;
 

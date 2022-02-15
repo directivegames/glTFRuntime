@@ -15,12 +15,12 @@ USkeletalMeshExporterGLTF::USkeletalMeshExporterGLTF(const FObjectInitializer& O
 
 void FglTFExportContextSkeletalMesh::GenerateSkeletalMesh(USkeletalMesh* SkeletalMesh)
 {
-	if (!SkeletalMesh->Skeleton)
+	if (!SkeletalMesh->GetSkeleton())
 	{
 		return;
 	}
 
-	GenerateSkeleton(SkeletalMesh->Skeleton);
+	GenerateSkeleton(SkeletalMesh->GetSkeleton());
 
 	TSharedRef<FJsonObject> JsonScene = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> JsonSceneNodes;

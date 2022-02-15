@@ -28,7 +28,7 @@ protected:
 class FglTFExportContextSkeleton : public FglTFExportContext
 {
 public:
-	void GenerateSkeleton(USkeleton* Skeleton);
+	void GenerateSkeleton(const USkeleton* Skeleton);
 protected:
 	void GetSkeletonBoneChildren(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex, TArray<int32>& BoneChildrenIndices);
 	FMatrix BuildBoneFullMatrix(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex);
