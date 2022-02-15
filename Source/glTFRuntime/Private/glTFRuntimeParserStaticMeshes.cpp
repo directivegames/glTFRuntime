@@ -202,7 +202,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 				{
 					if (UVIndex < Primitive.UVs.Num())
 					{
-						StaticMeshVertex.UVs[UVIndex] = GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore);
+						StaticMeshVertex.UVs[UVIndex] = FVector2f(GetSafeValue(Primitive.UVs[UVIndex], VertexIndex, FVector2D::ZeroVector, bMissingIgnore));
 					}
 				}
 
@@ -270,7 +270,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 					FVector4 TangentZ0 = StaticMeshVertex0.TangentZ;
 #endif
-					FVector2D UV0 = StaticMeshVertex0.UVs[0];
+					auto UV0 = StaticMeshVertex0.UVs[0];
 
 					FVector Position1 = StaticMeshVertex1.Position;
 #if ENGINE_MAJOR_VERSION > 4
@@ -278,7 +278,7 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 					FVector4 TangentZ1 = StaticMeshVertex1.TangentZ;
 #endif
-					FVector2D UV1 = StaticMeshVertex1.UVs[0];
+					auto UV1 = StaticMeshVertex1.UVs[0];
 
 					FVector Position2 = StaticMeshVertex2.Position;
 #if ENGINE_MAJOR_VERSION > 4
@@ -286,13 +286,13 @@ UStaticMesh* FglTFRuntimeParser::LoadStaticMesh_Internal(TSharedRef<FglTFRuntime
 #else
 					FVector4 TangentZ2 = StaticMeshVertex2.TangentZ;
 #endif
-					FVector2D UV2 = StaticMeshVertex2.UVs[0];
+					auto UV2 = StaticMeshVertex2.UVs[0];
 
 					FVector DeltaPosition0 = Position1 - Position0;
 					FVector DeltaPosition1 = Position2 - Position0;
 
-					FVector2D DeltaUV0 = UV1 - UV0;
-					FVector2D DeltaUV1 = UV2 - UV0;
+					auto DeltaUV0 = UV1 - UV0;
+					auto DeltaUV1 = UV2 - UV0;
 
 					float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
 
