@@ -160,6 +160,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	int32 GetArraySizeFromPath(const TArray<FglTFRuntimePathItem> Path, bool& bFound) const;
 
+#if 1 // WITH_DIRECTIVE
+	const TSharedPtr<FglTFRuntimeParser>& GetParser() const { return Parser; }
+#endif
+
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	bool LoadAudioEmitter(const int32 EmitterIndex, FglTFRuntimeAudioEmitter& Emitter);
 
@@ -183,5 +187,4 @@ public:
 
 protected:
 	TSharedPtr<FglTFRuntimeParser> Parser;
-	
 };

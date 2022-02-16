@@ -15,6 +15,11 @@
 #include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
 #include "Serialization/ArrayReader.h"
+
+#if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeStats.h"
+#endif
+
 #include "glTFRuntimeParser.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogGLTFRuntime, Log, All);
@@ -347,6 +352,29 @@ struct FglTFRuntimeMaterialsConfig
 	}
 };
 
+#if 1 // WITH_DIRECTIVE
+USTRUCT(BlueprintType)
+struct FConvexCollisionGenerationConfig
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bGenerateConvexCollision = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bUseAsyncGeneration = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 HullCount = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 MaxHullVerts = 16;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	int32 HullPrecision = 100000;
+};
+#endif
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeStaticMeshConfig
 {
@@ -399,6 +427,11 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bReverseTangents;
+
+#if 1 // WITH_DIRECTIVE
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FConvexCollisionGenerationConfig ConvexCollisionConfig;
+#endif
 
 	FglTFRuntimeStaticMeshConfig()
 	{
@@ -603,6 +636,18 @@ struct FglTFRuntimeSkeletalMeshConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bPerPolyCollision;
 
+#if 1 // WITH_DIRECTIVE
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bBuildSimpleCollision = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bLoadSkeletalAnimations = true;
+
+	// If specified, only the morph targets whitelisted will be loaded
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FString> WhitelistedMorphTargetNames;
+#endif
+
 	FglTFRuntimeSkeletalMeshConfig()
 	{
 		CacheMode = EglTFRuntimeCacheMode::ReadWrite;
@@ -789,6 +834,10 @@ struct FglTFRuntimeSkeletalMeshContext : public FGCObject
 	{
 		Collector.AddReferencedObject(SkeletalMesh);
 	}
+
+#if 1 // WITH_DIRECTIVE
+	FString GetReferencerName() const override { return TEXT("FglTFRuntimeSkeletalMeshContext"); }
+#endif
 };
 
 struct FglTFRuntimeStaticMeshContext : public FGCObject
@@ -993,10 +1042,6 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FglTFRuntimeSkeletalMeshAsync, USkeletalMesh*,
 class GLTFRUNTIME_API FglTFRuntimeParser : public FGCObject, public TSharedFromThis<FglTFRuntimeParser>
 {
 public:
-#if 1 // WITH_DIRECTIVE
-	FString GetReferencerName() const override { return TEXT("FglTFRuntimeParser"); }
-#endif
-	
 	FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale);
 
 	static TSharedPtr<FglTFRuntimeParser> FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig);
@@ -1048,7 +1093,11 @@ public:
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
 
+#if 1 // WITH_DIRECTIVE
+	const TArray64<uint8>* GetBuffer(int32 BufferIndex);
+#else
 	bool GetBuffer(int32 BufferIndex, TArray64<uint8>& Bytes);
+#endif
 	bool GetBufferView(int32 BufferViewIndex, TArray64<uint8>& Bytes, int64& Stride);
 	bool GetAccessor(int32 AccessorIndex, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, TArray64<uint8>& Bytes);
 
@@ -1066,6 +1115,10 @@ public:
 	bool ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes);
 
 	void AddReferencedObjects(FReferenceCollector& Collector);
+
+#if 1 // WITH_DIRECTIVE
+	FString GetReferencerName() const override { return TEXT("FglTFRuntimeParser"); }
+#endif
 
 	bool LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
 	bool LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig);
@@ -1095,6 +1148,15 @@ public:
 
 
 	TSharedPtr<FJsonValue> GetJSONObjectFromPath(const TArray<FglTFRuntimePathItem>& Path) const;
+
+#if 1 // WITH_DIRECTIVE
+	const TMap<int32, UStaticMesh*>& GetLoadedStaticMeshes() const { return StaticMeshesCache; }
+	const TMap<int32, UMaterialInterface*>& GetLoadedMaterials() const { return MaterialsCache; }
+	const TMap<int32, USkeleton*>& GetLoadedSkeletons() const { return SkeletonsCache; }
+	const TMap<int32, USkeletalMesh*>& GetLoadedSkeletalMeshes() const { return SkeletalMeshesCache; }
+	const TMap<int32, UTexture2D*>& GetLoadedTextures() const { return TexturesCache; }
+	static void AddStaticMeshComponentReference(UStaticMeshComponent* Component);
+#endif
 
 	FString GetJSONStringFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
 	double GetJSONNumberFromPath(const TArray<FglTFRuntimePathItem>& Path, bool& bFound) const;
@@ -1196,6 +1258,9 @@ protected:
 	template<typename T, typename Callback>
 	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, bool bNormalized, Callback Filter)
 	{
+#if 1 // WITH_DIRECTIVE
+		TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildFromAccessorField);
+#endif
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
 			return false;
@@ -1407,3 +1472,18 @@ protected:
 	FVector ComputeTangentY(const FVector Normal, const FVector TangetX);
 	FVector ComputeTangentYWithW(const FVector Normal, const FVector TangetX, const float W);
 };
+
+#if 1 // WITH_DIRECTIVE
+/** Helper class to ensure the needed materials are cooked. */
+UCLASS()
+class UglTFMaterialLoader : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TArray<class UMaterialInterface*> LoadedMaterials;
+	
+	UglTFMaterialLoader();
+};
+#endif

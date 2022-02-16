@@ -9,6 +9,10 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Modules/ModuleManager.h"
 
+#if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeSettings.h"
+#include "glTFRuntimeStats.h"
+#endif
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
@@ -205,7 +209,15 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 
 UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildTexture);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildTexture);
+	UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Public);
+	UE_LOG(LogGLTFRuntime, Log, TEXT("FglTFRuntimeParser::BuildTexture: created texture of size %dx%d at index %d"),
+		Mips[0].Width, Mips[0].Height, Mips[0].TextureIndex);
+#else
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
+#endif
 
 	auto PlatformData = new FTexturePlatformData();	
 	PlatformData->SizeX = Mips[0].Width;
@@ -252,6 +264,20 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 	Texture->UpdateResource();
 
+#if WITH_EDITOR // WITH_DIRECTIVE
+	{
+		ETextureSourceFormat Format = TSF_BGRA8;
+		FTextureSourceBlock Block;
+		Block.BlockX = Block.BlockY = 0;
+		Block.NumMips = 1;
+		Block.NumSlices = 1;
+		Block.SizeX = Mips[0].Width;
+		Block.SizeY = Mips[0].Height;
+		auto BlockData = Mips[0].Pixels.GetData();
+		Texture->Source.InitBlocked(&Format, &Block, 1, 1, &BlockData);
+	}
+#endif
+
 	TexturesCache.Add(Mips[0].TextureIndex, Texture);
 
 	return Texture;
@@ -259,6 +285,11 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildMaterial);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildMaterial);
+#endif
+
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_BuildMaterial, FColor::Magenta);
 
 	UMaterialInterface* BaseMaterial = nullptr;
@@ -291,12 +322,47 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		BaseMaterial = MaterialsConfig.MaterialsOverrideByNameMap[MaterialName];
 	}
 
+#if 1 // WITH_DIRECTIVE
+	if (auto RuntimeSettings = GetDefault<UglTFRuntimeSettings>())
+	{
+		if (auto Record = RuntimeSettings->MetallicRoughnessMaterialsMap.Find(RuntimeMaterial.MaterialType))
+		{
+			if (!Record->IsNull())
+			{
+				if (auto Loaded = Record->LoadSynchronous())
+				{
+					BaseMaterial = Loaded;
+				}
+			}
+		}
+
+		if (RuntimeMaterial.bHasSpecularFactor || RuntimeMaterial.bHasGlossinessFactor)
+		{
+			if (auto Record = RuntimeSettings->SpecularGlossinessMaterialsMap.Find(RuntimeMaterial.MaterialType))
+			{
+				if (!Record->IsNull())
+				{
+					if (auto Loaded = Record->LoadSynchronous())
+					{
+						BaseMaterial = Loaded;
+					}
+				}
+			}
+		}
+	}
+#endif
+
 	if (!BaseMaterial)
 	{
 		return nullptr;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, GetTransientPackage());
+#else
 	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+#endif
+	
 	if (!Material)
 	{
 		return nullptr;
@@ -466,6 +532,11 @@ bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& Unco
 
 UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadTexture);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadTexture);
+#endif
+	
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadTexture, FColor::Magenta);
 
 	if (TextureIndex < 0)
@@ -590,6 +661,11 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors, FString& MaterialName)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadMaterial);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadMaterial);
+#endif
+	
 	if (Index < 0)
 	{
 		return nullptr;

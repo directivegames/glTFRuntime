@@ -49,6 +49,11 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, TMap<
 	TSharedRef<IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
 #endif
 	HttpRequest->SetURL(Url);
+
+#if 1 // WITH_DIRECTIVE
+	HttpRequest->SetVerb(TEXT("GET"));
+#endif
+	
 	for (TPair<FString, FString> Header : Headers)
 	{
 		HttpRequest->AppendToHeader(Header.Key, Header.Value);

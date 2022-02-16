@@ -9,11 +9,20 @@
 #include "Misc/Compression.h"
 #include "Interfaces/IPluginManager.h"
 
+#if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeStats.h"
+#endif
+
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
+
 
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& Filename, const FglTFRuntimeConfig& LoaderConfig)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromFilename, FColor::Magenta);
+
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromFilename);
+#endif
 
 	FString TruePath = Filename;
 
@@ -67,6 +76,11 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromFilename(const FString& F
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromData(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromData, FColor::Magenta);
+
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromData);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAssets);
+#endif
 
 	// required for Gzip;
 	TArray<uint8> UncompressedData;
@@ -226,13 +240,23 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromString, FColor::Magenta);
 
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromString);
+#endif
+
 	TSharedPtr<FJsonValue> RootValue;
 
-	TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
-	if (!FJsonSerializer::Deserialize(JsonReader, RootValue))
 	{
-		return nullptr;
-	}
+#if 1 // WITH_DIRECTIVE
+		LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadJson);
+#endif
+
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonData);
+		if (!FJsonSerializer::Deserialize(JsonReader, RootValue))
+		{
+			return nullptr;
+		}
+	}	
 
 	TSharedPtr<FJsonObject> JsonObject = RootValue->AsObject();
 	if (!JsonObject)
@@ -263,6 +287,10 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataPtr, int64 DataNum, const FglTFRuntimeConfig& LoaderConfig, TSharedPtr<FglTFRuntimeZipFile> InZipFile)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_FromBinary, FColor::Magenta);
+
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FromBinary);
+#endif
 
 	FString JsonData;
 	TArray64<uint8> BinaryBuffer;
@@ -314,6 +342,9 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 	{
 		if (bBinaryFound)
 		{
+#if 1 // WITH_DIRECTIVE
+ 			LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::StoreBinaryBuffer);
+#endif
 			Parser->SetBinaryBuffer(BinaryBuffer);
 		}
 	}
@@ -640,6 +671,10 @@ TArray<int32> FglTFRuntimeParser::GetJsonExtensionObjectIndices(TSharedRef<FJson
 
 bool FglTFRuntimeParser::LoadScene(int32 SceneIndex, FglTFRuntimeScene& Scene)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadScene);
+#endif
+	
 	TSharedPtr<FJsonObject> JsonSceneObject = GetJsonObjectFromRootIndex("scenes", SceneIndex);
 	if (!JsonSceneObject)
 	{
@@ -682,6 +717,10 @@ bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 
 bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNode);
+#endif
+
 	// a bit hacky, but allows zero-copy for cached values
 	if (!bAllNodesCached)
 	{
@@ -840,6 +879,10 @@ bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> 
 
 bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, float& Duration, FString& Name, TFunctionRef<void(const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)> Callback, TFunctionRef<bool(const FglTFRuntimeNode& Node)> NodeFilter)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadAnimation_Internal);
+#endif
+
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
@@ -1656,6 +1699,11 @@ bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, in
 
 bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, TArray<FglTFRuntimePrimitive>& Primitives, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadPrimitives);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadPrimitives);
+#endif
+
 	// get primitives
 	const TArray<TSharedPtr<FJsonValue>>* JsonPrimitives;
 	if (!JsonMeshObject->TryGetArrayField("primitives", JsonPrimitives))
@@ -1759,6 +1807,10 @@ bool FglTFRuntimeParser::LoadPrimitives(TSharedRef<FJsonObject> JsonMeshObject, 
 bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObject, FglTFRuntimePrimitive& Primitive, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_LoadPrimitive, FColor::Magenta);
+
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadPrimitive);
+#endif
 
 	const TSharedPtr<FJsonObject>* JsonAttributesObject;
 	if (!JsonPrimitiveObject->TryGetObjectField("attributes", JsonAttributesObject))
@@ -2061,7 +2113,59 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	return true;
 }
 
+#if 1 // WITH_DIRECTIVE
+const TArray64<uint8>* FglTFRuntimeParser::GetBuffer(int32 Index)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::GetBuffer);
 
+	if (Index < 0)
+		return nullptr;
+
+	if (Index == 0 && BinaryBuffer.Num() > 0)
+	{
+		return &BinaryBuffer;
+	}
+
+	// first check cache
+	if (BuffersCache.Contains(Index))
+	{
+		return &BuffersCache[Index];
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonBuffers;
+
+	// no buffers ?
+	if (!Root->TryGetArrayField("buffers", JsonBuffers))
+	{
+		return nullptr;
+	}
+
+	if (Index >= JsonBuffers->Num())
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonObject> JsonBufferObject = (*JsonBuffers)[Index]->AsObject();
+	if (!JsonBufferObject)
+		return nullptr;
+
+	int64 ByteLength;
+	if (!JsonBufferObject->TryGetNumberField("byteLength", ByteLength))
+		return nullptr;
+
+	FString Uri;
+	if (!JsonBufferObject->TryGetStringField("uri", Uri))
+		return nullptr;
+
+	TArray64<uint8> Bytes;
+	if (ParseBase64Uri(Uri, Bytes))
+	{
+		return &BuffersCache.Add(Index, Bytes);
+	}
+
+	return nullptr;
+}
+#else
 bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 {
 	if (Index < 0)
@@ -2140,6 +2244,7 @@ bool FglTFRuntimeParser::GetBuffer(int32 Index, TArray64<uint8>& Bytes)
 	AddError("GetBuffer()", FString::Printf(TEXT("Unable to load buffer %d from Uri %s (you may want to enable external files loading...)"), Index, *Uri));
 	return false;
 }
+#endif
 
 bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Bytes)
 {
@@ -2164,6 +2269,10 @@ bool FglTFRuntimeParser::ParseBase64Uri(const FString& Uri, TArray64<uint8>& Byt
 
 bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int64& Stride)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::GetBufferView);
+#endif
+
 	if (Index < 0)
 	{
 		return false;
@@ -2195,11 +2304,20 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int6
 		return false;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	const auto WholeDataPtr = GetBuffer(BufferIndex);
+	if (!WholeDataPtr)
+	{
+		return false;
+	}
+	const auto& WholeData = *WholeDataPtr;
+#else
 	TArray64<uint8> WholeData;
 	if (!GetBuffer(BufferIndex, WholeData))
 	{
 		return false;
 	}
+#endif
 
 	int64 ByteLength;
 	if (!JsonBufferObject->TryGetNumberField("byteLength", ByteLength))
@@ -2229,6 +2347,9 @@ bool FglTFRuntimeParser::GetBufferView(int32 Index, TArray64<uint8>& Bytes, int6
 
 bool FglTFRuntimeParser::GetAccessor(int32 Index, int64& ComponentType, int64& Stride, int64& Elements, int64& ElementSize, int64& Count, bool& bNormalized, TArray64<uint8>& Bytes)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::GetAccessor);
+#endif
 
 	TSharedPtr<FJsonObject> JsonAccessorObject = GetJsonObjectFromRootIndex("accessors", Index);
 	if (!JsonAccessorObject)
@@ -2946,3 +3067,29 @@ FVector FglTFRuntimeParser::ComputeTangentYWithW(const FVector Normal, const FVe
 {
 	return (Normal ^ TangetX) * W;
 }
+
+#if 1 // WITH_DIRECTIVE
+#include "UObject/ConstructorHelpers.h"
+
+UglTFMaterialLoader::UglTFMaterialLoader()
+{
+	// see FglTFRuntimeParser::FglTFRuntimeParser
+	static const TArray<FString> MaterialPaths = {
+		TEXT("/glTFRuntime/M_glTFRuntimeBase.M_glTFRuntimeBase"),
+		TEXT("/glTFRuntime/M_glTFRuntimeTranslucent_Inst.M_glTFRuntimeTranslucent_Inst"),
+		TEXT("/glTFRuntime/M_glTFRuntimeTwoSided_Inst.M_glTFRuntimeTwoSided_Inst"),
+		TEXT("/glTFRuntime/M_glTFRuntimeTwoSidedTranslucent_Inst.M_glTFRuntimeTwoSidedTranslucent_Inst"),
+		TEXT("/glTFRuntime/M_glTFRuntime_SG_Base.M_glTFRuntime_SG_Base"),
+		TEXT("/glTFRuntime/M_glTFRuntime_SG_Translucent_Inst.M_glTFRuntime_SG_Translucent_Inst"),
+		TEXT("/glTFRuntime/M_glTFRuntime_SG_TwoSided_Inst.M_glTFRuntime_SG_TwoSided_Inst"),
+		TEXT("/glTFRuntime/M_glTFRuntime_SG_TwoSidedTranslucent_Inst.M_glTFRuntime_SG_TwoSidedTranslucent_Inst")
+	};
+
+	for (const auto& MaterialPath : MaterialPaths)
+	{
+		ConstructorHelpers::FObjectFinder<UMaterialInterface> MaterialRef(*MaterialPath);
+		LoadedMaterials.Add(MaterialRef.Object);
+	}
+}
+#endif
+

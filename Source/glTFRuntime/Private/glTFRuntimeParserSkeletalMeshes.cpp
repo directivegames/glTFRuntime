@@ -21,6 +21,10 @@
 #include "Animation/AnimCurveTypes.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 
+#if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeStats.h"
+#endif
+
 struct FglTFRuntimeSkeletalMeshContextFinalizer
 {
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext;
@@ -160,6 +164,10 @@ void FglTFRuntimeParser::CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkelet
 
 USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::CreateSkeletalMeshFromLODs);
+#endif
+
 	SkeletalMeshContext->SkeletalMesh->SetEnablePerPolyCollision(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision);
 
 	if (SkeletalMeshContext->SkeletalMeshConfig.OverrideSkinIndex > INDEX_NONE)
@@ -702,6 +710,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::FinalizeSkeletalMesh);
+#endif
 
 #if !WITH_EDITOR
 	bool bHasMorphTargets = false;
@@ -711,7 +723,12 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
 #if WITH_EDITOR
-		SkeletalMeshContext->SkeletalMesh->SaveLODImportedData(LODIndex, SkeletalMeshContext->LODs[LODIndex].ImportData);
+		{
+#if 1 // WITH_DIRECTIVE
+			TRACE_CPUPROFILER_EVENT_SCOPE(SaveLODImportedData);
+#endif
+			SkeletalMeshContext->SkeletalMesh->SaveLODImportedData(LODIndex, SkeletalMeshContext->LODs[LODIndex].ImportData);
+		}		
 #endif
 		// LOD tuning
 
@@ -732,10 +749,20 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		int32 BaseIndex = 0;
 		for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex].Primitives.Num(); PrimitiveIndex++)
 		{
+#if 1 // WITH_DIRECTIVE
+			LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadMorphTarget);
+			const auto& WhitelistedMorphTargetNames = SkeletalMeshContext->SkeletalMeshConfig.WhitelistedMorphTargetNames;
+#endif
 			FglTFRuntimePrimitive& Primitive = SkeletalMeshContext->LODs[LODIndex].Primitives[PrimitiveIndex];
 
 			for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
 			{
+#if 1 // WITH_DIRECTIVE
+				if (WhitelistedMorphTargetNames.Num() && !WhitelistedMorphTargetNames.Contains(MorphTargetData.Name))
+				{
+					continue;
+				}
+#endif
 				FMorphTargetLODModel MorphTargetLODModel;
 				MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
 				MorphTargetLODModel.SectionIndices.Add(PrimitiveIndex);
@@ -790,6 +817,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].Primitives[MatIndex].MaterialName)));
 		}
 #if WITH_EDITOR
+#if 1 // WITH_DIRECTIVE
+		TRACE_CPUPROFILER_EVENT_SCOPE(BuildSkeletalMesh);
+#endif
 		IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION >= 27
 		FSkeletalMeshBuildParameters SkeletalMeshBuildParameters(SkeletalMeshContext->SkeletalMesh, GetTargetPlatformManagerRef().GetRunningTargetPlatform(), LODIndex, false);
@@ -804,10 +834,18 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 
 #if WITH_EDITOR
-	SkeletalMeshContext->SkeletalMesh->Build();
+	{
+#if 1 // WITH_DIRECTIVE
+		TRACE_CPUPROFILER_EVENT_SCOPE(BuildSkeletalMesh);
+#endif
+		SkeletalMeshContext->SkeletalMesh->Build();
+	}	
 #else
 	if (bHasMorphTargets)
 	{
+#if 1 // WITH_DIRECTIVE
+		LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::InitMorphTarget);
+#endif
 		SkeletalMeshContext->SkeletalMesh->InitMorphTargets();
 	}
 #endif
@@ -928,12 +966,41 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 #endif
 
+#if 1 // WITH_DIRECTIVE
+	if (SkeletalMeshContext->SkeletalMeshConfig.bBuildSimpleCollision)
+	{
+		auto SkeletalMesh = SkeletalMeshContext->SkeletalMesh;
+		if (!SkeletalMesh->BodySetup)
+		{
+			SkeletalMesh->CreateBodySetup();
+		}
+
+		auto BodySetup = SkeletalMesh->BodySetup;
+
+		BodySetup->bMeshCollideAll = false;
+		BodySetup->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseSimpleAsComplex;
+		BodySetup->InvalidatePhysicsData();
+
+		FKBoxElem BoxElem;
+		BoxElem.Center = SkeletalMeshContext->BoundingBox.GetCenter();
+		BoxElem.X = SkeletalMeshContext->BoundingBox.GetExtent().X * 2.0f;
+		BoxElem.Y = SkeletalMeshContext->BoundingBox.GetExtent().Y * 2.0f;
+		BoxElem.Z = SkeletalMeshContext->BoundingBox.GetExtent().Z * 2.0f;
+		BodySetup->AggGeom.BoxElems.Add(BoxElem);
+		BodySetup->CreatePhysicsMeshes();
+	}
+#endif
+
 	return SkeletalMeshContext->SkeletalMesh;
 }
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
-
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadSkeletalMesh);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadSkeletalMesh);
+#endif
+	
 	// first check cache
 	if (CanReadFromCache(SkeletalMeshConfig.CacheMode) && SkeletalMeshesCache.Contains(MeshIndex))
 	{
@@ -1327,6 +1394,10 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
+	
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1362,7 +1433,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * S
 
 UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
-
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
+	
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1444,6 +1518,10 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
+	
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1686,7 +1764,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
-
+#if 1 // WITH_DIRECTIVE
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
+#endif
+	
 	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
 	{
 		int32 NumFrames = Duration * 30;
