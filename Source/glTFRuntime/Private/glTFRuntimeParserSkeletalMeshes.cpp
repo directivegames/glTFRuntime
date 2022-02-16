@@ -537,12 +537,12 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 				}
 				if (Primitive.UVs.Num() > 0 && Index < Primitive.UVs[0].Num())
 				{
-					ModelVertex.TexCoord = Primitive.UVs[0][Index];
+					ModelVertex.TexCoord = FVector2f(Primitive.UVs[0][Index]);
 					LOD.bHasUV = true;
 				}
 				else
 				{
-					ModelVertex.TexCoord = FVector2D::ZeroVector;
+					ModelVertex.TexCoord = FVector2f::ZeroVector;
 				}
 
 				LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(TotalVertexIndex) = ModelVertex.Position;
@@ -638,7 +638,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 				FVector4 TangentZ0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex);
 #endif
-				FVector2D UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
+				auto UV0 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex, 0);
 
 				FVector Position1 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 1);
 #if ENGINE_MAJOR_VERSION > 4
@@ -646,7 +646,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 				FVector4 TangentZ1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 1);
 #endif
-				FVector2D UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
+				auto UV1 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 1, 0);
 
 				FVector Position2 = LodRenderData->StaticVertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex + 2);
 #if ENGINE_MAJOR_VERSION > 4
@@ -654,13 +654,13 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 #else
 				FVector4 TangentZ2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(VertexIndex + 2);
 #endif
-				FVector2D UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
+				auto UV2 = LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.GetVertexUV(VertexIndex + 2, 0);
 
-				FVector DeltaPosition0 = Position1 - Position0;
-				FVector DeltaPosition1 = Position2 - Position0;
+				auto DeltaPosition0 = Position1 - Position0;
+				auto DeltaPosition1 = Position2 - Position0;
 
-				FVector2D DeltaUV0 = UV1 - UV0;
-				FVector2D DeltaUV1 = UV2 - UV0;
+				auto DeltaUV0 = UV1 - UV0;
+				auto DeltaUV1 = UV2 - UV0;
 
 				float Factor = 1.0f / (DeltaUV0.X * DeltaUV1.Y - DeltaUV0.Y * DeltaUV1.X);
 
@@ -970,12 +970,12 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	if (SkeletalMeshContext->SkeletalMeshConfig.bBuildSimpleCollision)
 	{
 		auto SkeletalMesh = SkeletalMeshContext->SkeletalMesh;
-		if (!SkeletalMesh->BodySetup)
+		if (!SkeletalMesh->GetBodySetup())
 		{
 			SkeletalMesh->CreateBodySetup();
 		}
 
-		auto BodySetup = SkeletalMesh->BodySetup;
+		auto BodySetup = SkeletalMesh->GetBodySetup();
 
 		BodySetup->bMeshCollideAll = false;
 		BodySetup->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseSimpleAsComplex;

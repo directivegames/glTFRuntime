@@ -40,7 +40,14 @@ void AglTFRuntimeAssetActor::BeginPlay()
 	{
 #if 1 // WITH_DIRECTIVE
 		USceneComponent* SceneComponent = NewObject<USceneComponent>(GetComponentOwner(), *FString::Printf(TEXT("Scene %d"), Scene.Index));
-		SceneComponent->SetupAttachment(DelegateRootComponent ? DelegateRootComponent : RootComponent);
+        if (DelegateRootComponent)
+        {
+            SceneComponent->SetupAttachment(DelegateRootComponent);
+        }
+        else
+        {
+            SceneComponent->SetupAttachment(RootComponent);
+        }
 		SceneComponent->RegisterComponent();
 		CustomAddInstanceComponent(SceneComponent);
 #else
