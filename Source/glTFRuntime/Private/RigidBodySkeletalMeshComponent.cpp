@@ -24,7 +24,7 @@ UBodySetup* URigidBodySkeletalMeshComponent::GetBodySetup()
 {
 	if (SkeletalMesh)
 	{
-		return SkeletalMesh->BodySetup;
+		return SkeletalMesh->GetBodySetup();
 	}
 
 	return nullptr;
@@ -40,10 +40,10 @@ void URigidBodySkeletalMeshComponent::TickComponent(float DeltaTime, enum ELevel
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST) && 0
-	if (SkeletalMesh && SkeletalMesh->BodySetup)
+	if (SkeletalMesh && SkeletalMesh->GetBodySetup())
 	{
 		const auto ComponentTransform = K2_GetComponentToWorld();
-		for (const auto& Box : SkeletalMesh->BodySetup->AggGeom.BoxElems)
+		for (const auto& Box : SkeletalMesh->GetBodySetup()->AggGeom.BoxElems)
 		{
 			FVector Scale(Box.X, Box.Y, Box.Z);
 			Scale = Scale * ComponentTransform.GetScale3D() / 2.f;
