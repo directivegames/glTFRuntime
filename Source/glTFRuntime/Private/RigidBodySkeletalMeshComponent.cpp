@@ -24,7 +24,7 @@ UBodySetup* URigidBodySkeletalMeshComponent::GetBodySetup()
 {
 	if (SkeletalMesh)
 	{
-		return SkeletalMesh->GetBodySetup();
+		return const_cast<const USkeletalMesh*>(SkeletalMesh.Get())->GetBodySetup();
 	}
 
 	return nullptr;

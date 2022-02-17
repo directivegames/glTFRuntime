@@ -23,6 +23,7 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeStats.h"
+#include "UObject/SavePackage.h"
 #endif
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer
@@ -958,7 +959,13 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		if (Package && Package != GetTransientPackage())
 		{
 			const FString Filename = FPackageName::LongPackageNameToFilename(SkeletalMeshContext->SkeletalMeshConfig.SaveToPackage, FPackageName::GetAssetPackageExtension());
+#if 1 // WITH_DIRECTIVE
+			FSavePackageArgs SaveArgs = { nullptr, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone, SAVE_None, false,
+				true, true, FDateTime::MinValue(), GError };
+			if (UPackage::SavePackage(Package, nullptr, *Filename, SaveArgs))
+#else
 			if (UPackage::SavePackage(Package, nullptr, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone, *Filename))
+#endif
 			{
 				FAssetRegistryModule::AssetCreated(SkeletalMeshContext->SkeletalMesh);
 			}
@@ -969,10 +976,10 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #if 1 // WITH_DIRECTIVE
 	if (SkeletalMeshContext->SkeletalMeshConfig.bBuildSimpleCollision)
 	{
-		auto SkeletalMesh = SkeletalMeshContext->SkeletalMesh;
+		const USkeletalMesh* SkeletalMesh = SkeletalMeshContext->SkeletalMesh;
 		if (!SkeletalMesh->GetBodySetup())
 		{
-			SkeletalMesh->CreateBodySetup();
+			SkeletalMeshContext->SkeletalMesh->CreateBodySetup();
 		}
 
 		auto BodySetup = SkeletalMesh->GetBodySetup();
@@ -1546,8 +1553,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
 	AnimSequence->SetPreviewMesh(SkeletalMesh);
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	AnimSequence->SetRawNumberOfFrame(NumFrames);
 	AnimSequence->SetSequenceLength(Duration);
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
@@ -1700,7 +1709,13 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		}
 
 #if WITH_EDITOR
+	#if 1 // WITH_DIRECTIVE
+		auto& AnimationController = AnimSequence->GetController();
+		AnimationController.AddBoneTrack(BoneName);
+		AnimationController.SetBoneTrackKeys(BoneName, Pair.Value.PosKeys, Pair.Value.RotKeys, Pair.Value.ScaleKeys);
+	#else
 		AnimSequence->AddNewRawTrack(BoneName, &Pair.Value);
+	#endif
 #else
 		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
 #endif
@@ -1717,9 +1732,12 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			AnimSequence->GetSkeleton()->VerifySmartName(USkeleton::AnimCurveMappingName, SmartName);
 		}
 
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		// TODO: remove the deprecation warning suppression once we know how to import animation data in UE5 properly
 		AnimSequence->RawCurveData.AddCurveData(SmartName);
 
 		FFloatCurve* NewCurve = (FFloatCurve*)AnimSequence->RawCurveData.GetCurveData(SmartName.UID, ERawCurveTrackTypes::RCT_Float);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		for (TPair<float, float>& CurvePair : Pair.Value)
 		{
@@ -1751,7 +1769,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	}
 
 #if WITH_EDITOR
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	AnimSequence->PostProcessSequence();
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #else
 	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
 	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
