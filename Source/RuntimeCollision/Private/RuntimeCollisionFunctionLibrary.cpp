@@ -11,7 +11,7 @@
 static TArray<TSharedPtr<FAsyncConvexCollisionGenerator>> AllGenerators;
 
 
-static bool PrepareStaticMeshForCollisionGeneration(UStaticMesh* StaticMesh, TArray<FVector>& Vertices, TArray<uint32>& Indices)
+static bool PrepareStaticMeshForCollisionGeneration(UStaticMesh* StaticMesh, TArray<FVector3f>& Vertices, TArray<uint32>& Indices)
 {
 	check(StaticMesh);
 
@@ -88,7 +88,7 @@ bool URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(USta
 		return false;
 	}
 
-	TArray<FVector> Verts;
+	TArray<FVector3f> Verts;
 	TArray<uint32> CollidingIndices;
 
 	if (!PrepareStaticMeshForCollisionGeneration(StaticMesh, Verts, CollidingIndices))
@@ -191,7 +191,7 @@ bool FAsyncConvexCollisionGenerator::DoGenerateCollisionForStaticMesh(UStaticMes
 		return false;
 	}
 	
-	TArray<FVector> Verts;
+	TArray<FVector3f> Verts;
 	TArray<uint32> CollidingIndices;
 
 	if (!PrepareStaticMeshForCollisionGeneration(StaticMesh, Verts, CollidingIndices))
@@ -200,7 +200,7 @@ bool FAsyncConvexCollisionGenerator::DoGenerateCollisionForStaticMesh(UStaticMes
 		return false;
 	}
 
-	if (!Task->DecomposeMeshToHullsAsyncBegin(StaticMesh->GetBodySetup(), Verts, CollidingIndices, HullCount, MaxHullVerts, HullPrecision))
+	if (!Task->DecomposeMeshToHullsAsyncBegin(StaticMesh->GetBodySetup(), MoveTemp(Verts), MoveTemp(CollidingIndices), HullCount, MaxHullVerts, HullPrecision))
 	{
 		Cleanup();
 		return false;
