@@ -9,6 +9,59 @@
 #endif
 #include "PhysicsEngine/BodySetup.h"
 
+
+#if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeStats.h"
+#include "RuntimeCollisionFunctionLibrary.h"
+
+static TArray<TWeakObjectPtr<UStaticMeshComponent>> StaticMeshComponents;
+void FglTFRuntimeParser::AddStaticMeshComponentReference(UStaticMeshComponent* Component)
+{
+    check(IsInGameThread());
+    if (!Component)
+    {
+        return;
+    }
+
+    for (auto& Record : StaticMeshComponents)
+    {
+        if (!Record.IsValid())
+        {
+            Record = Component;
+            return;
+        }
+    }
+    StaticMeshComponents.Add(Component);
+}
+
+static void HandleStaticMeshCollisionCreated(UStaticMesh* StaticMesh, bool bShouldRecreatePhysicsState)
+{
+    check(IsInGameThread());
+
+    if (!StaticMesh)
+    {
+        return;
+    }
+
+    for (auto& Record : StaticMeshComponents)
+    {
+        if (!Record.IsValid())
+        {
+            continue;
+        }
+
+        if (Record->GetStaticMesh() == StaticMesh)
+        {
+            if (bShouldRecreatePhysicsState)
+            {
+                Record->RecreatePhysicsState();
+            }
+            Record = nullptr;
+        }
+    }
+}
+#endif // WITH_DIRECTIVE
+
 FglTFRuntimeStaticMeshContext::FglTFRuntimeStaticMeshContext(TSharedRef<FglTFRuntimeParser> InParser, const FglTFRuntimeStaticMeshConfig& InStaticMeshConfig) :
 	Parser(InParser),
 	StaticMeshConfig(InStaticMeshConfig)
@@ -486,6 +539,25 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
 
 	BodySetup->InvalidatePhysicsData();
+    
+#if 0 // WITH_DIRECTIVE
+    // required for building complex collisions
+    auto MeshRenderData = StaticMesh->GetRenderData();
+    if (MeshRenderData && MeshRenderData->LODResources.Num() > 0)
+    {
+        FStaticMeshLODResources& LOD = MeshRenderData->LODResources[0];
+        ENQUEUE_RENDER_COMMAND(FixIndexBufferOnCPUCommand)(
+            [&LOD, &LOD0CPUVertexInstancesIDs](FRHICommandListImmediate& RHICmdList)
+        {
+            LOD.IndexBuffer.ReleaseResource();
+            LOD.IndexBuffer = FRawStaticIndexBuffer(true);
+            LOD.IndexBuffer.SetIndices(LOD0CPUVertexInstancesIDs, EIndexBufferStride::AutoDetect);
+            LOD.IndexBuffer.InitResource();
+        });
+
+        FlushRenderingCommands();
+    }
+#endif
 
 	if (StaticMeshConfig.bBuildSimpleCollision)
 	{
@@ -516,7 +588,34 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 		BodySetup->AggGeom.SphereElems.Add(SphereElem);
 	}
 
-	BodySetup->CreatePhysicsMeshes();
+#if 1 // WITH_DIRECTIVE
+    auto bHasConvexCollision = false;
+    if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
+    {
+        const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
+        bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
+    }
+
+    if (bHasConvexCollision)
+    {
+        auto Callback = FOnAsyncPhysicsCookFinished::CreateLambda([MeshReference = TWeakObjectPtr<UStaticMesh>(StaticMesh)](bool bSuccess)
+        {
+            if (!MeshReference.IsValid() || !bSuccess)
+            {
+                return;
+            }
+            HandleStaticMeshCollisionCreated(MeshReference.Get(), true);
+        });
+        StaticMesh->GetBodySetup()->CreatePhysicsMeshesAsync(Callback);
+    }
+    else
+    {
+        StaticMesh->GetBodySetup()->CreatePhysicsMeshes();
+        HandleStaticMeshCollisionCreated(StaticMesh, false);
+    }
+#else
+    StaticMesh->BodySetup->CreatePhysicsMeshes();
+#endif
 
 	for (const TPair<FString, FTransform>& Pair : StaticMeshConfig.Sockets)
 	{
@@ -568,7 +667,11 @@ bool FglTFRuntimeParser::LoadStaticMeshes(TArray<UStaticMesh*>& StaticMeshes, co
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMesh(const int32 MeshIndex, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
-
+#if 1 // WITH_DIRECTIVE
+    TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadStaticMesh);
+    LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadStaticMesh);
+#endif
+    
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 	if (!JsonMeshObject)
 	{

@@ -55,8 +55,8 @@ public:
 #if 1 // WITH_DIRECTIVE
 	// If specified, newly created components will be attached to the delegate root
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
-	USceneComponent* DelegateRootComponent;
-
+    TObjectPtr<USceneComponent> DelegateRootComponent;
+    
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	bool bLoadCurveBasedAnimations = true;
 #endif
