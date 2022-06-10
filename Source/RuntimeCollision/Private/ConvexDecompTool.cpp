@@ -10,7 +10,10 @@
 #include "PhysicsEngine/ConvexElem.h"
 
 #include "ThirdParty/VHACD/public/VHACD.h"
+
+#if CUSTOM_ENGINE
 #include "ThirdParty/VHACD/inc/btAlignedAllocator.h"
+#endif
 
 #include "PhysicsEngine/BodySetup.h"
 #include "Async/Async.h"
@@ -120,9 +123,11 @@ static void btFreeImpl(void* memblock)
 
 static void InitParameters(IVHACD::Parameters &VHACD_Params, uint32 InHullCount, uint32 InMaxHullVerts,uint32 InResolution)
 {
+#if CUSTOM_ENGINE
     // Override VHACD allocator with ours
     btAlignedAllocSetCustom(btAllocImpl, btFreeImpl);
     btAlignedAllocSetCustomAligned(btAlignedAllocImpl, btAlignedFreeImpl);
+#endif
 
 #ifdef DEBUG_VHACD
     VHACD_Params.m_logger = &VHACDLogger;
@@ -162,8 +167,10 @@ void DecomposeMeshToHulls(UBodySetup* InBodySetup, const TArray<FVector3f>& InVe
 
     TRACE_CPUPROFILER_EVENT_SCOPE(DecomposeMeshToHulls)
 
+#if CUSTOM_ENGINE
     btAlignedAllocSetCustom(btAllocImpl, btFreeImpl);
     btAlignedAllocSetCustomAligned(btAlignedAllocImpl, btAlignedFreeImpl);
+#endif
 
     FVHACDProgressCallback VHACD_Callback;
     IVHACD::Parameters VHACD_Params;

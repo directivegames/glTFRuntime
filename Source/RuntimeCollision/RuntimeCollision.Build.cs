@@ -31,5 +31,7 @@ public class RuntimeCollision : ModuleRules
         {
             PrivateDefinitions.Add("WITH_VHACD=0");
         }
+
+        PrivateDefinitions.Add("CUSTOM_ENGINE=1");
     }
 }
