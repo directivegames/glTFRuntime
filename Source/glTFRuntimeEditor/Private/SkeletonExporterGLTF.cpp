@@ -9,7 +9,11 @@ USkeletonExporterGLTF::USkeletonExporterGLTF(const FObjectInitializer& ObjectIni
 	SupportedClass = USkeleton::StaticClass();
 	FormatExtension.Add(TEXT("gltf"));
 	PreferredFormatIndex = 0;
+#if 1 // WITH_DIRECTIVE
+	FormatDescription.Add(TEXT("glTF Skeleton file"));
+#else
 	FormatDescription.Add(TEXT("glTF Embedded file"));
+#endif
 	bText = true;
 }
 
