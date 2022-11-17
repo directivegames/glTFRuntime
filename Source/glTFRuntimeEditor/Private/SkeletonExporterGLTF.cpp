@@ -1,7 +1,9 @@
-// Copyright 2020-2021, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris.
 
 
 #include "SkeletonExporterGLTF.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 
 USkeletonExporterGLTF::USkeletonExporterGLTF(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -44,7 +46,7 @@ FMatrix FglTFExportContextSkeleton::BuildBoneFullMatrix(const FReferenceSkeleton
 	return Transform.ToMatrixWithScale();
 }
 
-void FglTFExportContextSkeleton::GenerateSkeleton(const USkeleton* Skeleton)
+void FglTFExportContextSkeleton::GenerateSkeleton(USkeleton* Skeleton)
 {
 	const FReferenceSkeleton& SkeletonRef = Skeleton->GetReferenceSkeleton();
 

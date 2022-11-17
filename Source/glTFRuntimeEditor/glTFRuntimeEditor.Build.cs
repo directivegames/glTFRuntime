@@ -37,16 +37,18 @@ public class glTFRuntimeEditor : ModuleRules
             {
                 "CoreUObject",
                 "Engine",
+                "Slate",
+                "SlateCore",
+                "UnrealEd",
                 "Json",
                 "RHI",
                 "RenderCore",
-#if true // WITH_DIRECTIVE
-                "UnrealEd",
+                "LevelEditor",
                 "glTFRuntime",
-                "AssetRegistry",
-#endif
-                // ... add private dependencies that you statically link with here ...	
-            }
+                "DesktopPlatform",
+		        "EditorStyle"
+				// ... add private dependencies that you statically link with here ...	
+			}
             );
 
 

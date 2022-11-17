@@ -2,6 +2,8 @@
 
 
 #include "glTFRuntimeAssetActor.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/LightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
@@ -20,6 +22,11 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	AssetRoot = CreateDefaultSubobject<USceneComponent>(TEXT("AssetRoot"));
 	RootComponent = AssetRoot;
 	bAllowNodeAnimations = true;
+	bStaticMeshesAsSkeletal = false;
+	bAllowSkeletalAnimations = true;
+	bAllowPoseAnimations = true;
+	bAllowCameras = true;
+	bAllowLights = true;
 }
 
 // Called when the game starts or when spawned
@@ -31,26 +38,28 @@ void AglTFRuntimeAssetActor::BeginPlay()
 	{
 		return;
 	}
-    
+
 #if 1 // WITH_DIRECTIVE
-    TRACE_CPUPROFILER_EVENT_SCOPE(AglTFRuntimeAssetActor::BeginPlay);
+	TRACE_CPUPROFILER_EVENT_SCOPE(AglTFRuntimeAssetActor::BeginPlay);
 #endif
+
+	double LoadingStartTime = FPlatformTime::Seconds();
 
 	TArray<FglTFRuntimeScene> Scenes = Asset->GetScenes();
 	for (FglTFRuntimeScene& Scene : Scenes)
 	{
 #if 1 // WITH_DIRECTIVE
-        USceneComponent* SceneComponent = NewObject<USceneComponent>(GetComponentOwner(), *FString::Printf(TEXT("Scene %d"), Scene.Index));
-        SceneComponent->SetupAttachment(DelegateRootComponent ? DelegateRootComponent : RootComponent);
-        SceneComponent->RegisterComponent();
-        CustomAddInstanceComponent(SceneComponent);
+		USceneComponent* SceneComponent = NewObject<USceneComponent>(GetComponentOwner(), *FString::Printf(TEXT("Scene %d"), Scene.Index));
+		SceneComponent->SetupAttachment(DelegateRootComponent ? DelegateRootComponent : RootComponent);
+		SceneComponent->RegisterComponent();
+		CustomAddInstanceComponent(SceneComponent);
 #else
-        USceneComponent* SceneComponent = NewObject<USceneComponent>(this, *FString::Printf(TEXT("Scene %d"), Scene.Index));
-        SceneComponent->SetupAttachment(RootComponent);
-        SceneComponent->RegisterComponent();
-        AddInstanceComponent(SceneComponent);
+		USceneComponent* SceneComponent = NewObject<USceneComponent>(this, *FString::Printf(TEXT("Scene %d"), Scene.Index));
+		SceneComponent->SetupAttachment(RootComponent);
+		SceneComponent->RegisterComponent();
+		AddInstanceComponent(SceneComponent);
 #endif
-        for (int32 NodeIndex : Scene.RootNodesIndices)
+		for (int32 NodeIndex : Scene.RootNodesIndices)
 		{
 			FglTFRuntimeNode Node;
 			if (!Asset->GetNode(NodeIndex, Node))
@@ -74,12 +83,14 @@ void AglTFRuntimeAssetActor::BeginPlay()
 			}
 		}
 	}
+
+	UE_LOG(LogGLTFRuntime, Log, TEXT("Asset loaded in %f seconds"), FPlatformTime::Seconds() - LoadingStartTime);
 }
 
 void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, const FName SocketName, FglTFRuntimeNode& Node)
 {
 #if 1 // WITH_DIRECTIVE
-    TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::ProcessNode);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::ProcessNode);
 #endif
 	// special case for bones/joints
 	if (Asset->NodeIsBone(Node.Index))
@@ -97,73 +108,89 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 
 	USceneComponent* NewComponent = nullptr;
-	if (Node.CameraIndex != INDEX_NONE)
+	if (bAllowCameras && Node.CameraIndex != INDEX_NONE)
 	{
 #if 1 // WITH_DIRECTIVE
-        TRACE_CPUPROFILER_EVENT_SCOPE(AddCameraComponent);
-        UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(GetComponentOwner(), *Node.Name);
-        NewCameraComponent->SetupAttachment(NodeParentComponent);
-        NewCameraComponent->RegisterComponent();
-        NewCameraComponent->SetRelativeTransform(Node.Transform);
-        CustomAddInstanceComponent(NewCameraComponent);
+		TRACE_CPUPROFILER_EVENT_SCOPE(AddCameraComponent);
+		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(GetComponentOwner(), *Node.Name);
+		NewCameraComponent->SetupAttachment(NodeParentComponent);
+		NewCameraComponent->RegisterComponent();
+		NewCameraComponent->SetRelativeTransform(Node.Transform);
+		CustomAddInstanceComponent(NewCameraComponent);
 #else
-        UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, *Node.Name);
-        NewCameraComponent->SetupAttachment(NodeParentComponent);
-        NewCameraComponent->RegisterComponent();
-        NewCameraComponent->SetRelativeTransform(Node.Transform);
-        AddInstanceComponent(NewCameraComponent);
+		UCameraComponent* NewCameraComponent = NewObject<UCameraComponent>(this, GetSafeNodeName<UCameraComponent>(Node));
+		NewCameraComponent->SetupAttachment(NodeParentComponent);
+		NewCameraComponent->RegisterComponent();
+		NewCameraComponent->SetRelativeTransform(Node.Transform);
+		AddInstanceComponent(NewCameraComponent);
 #endif
-        Asset->LoadCamera(Node.CameraIndex, NewCameraComponent);
+		Asset->LoadCamera(Node.CameraIndex, NewCameraComponent);
 		NewComponent = NewCameraComponent;
 
 	}
 	else if (Node.MeshIndex < 0)
 	{
 #if 1 // WITH_DIRECTIVE
-        TRACE_CPUPROFILER_EVENT_SCOPE(AddSceneComponent);
-        NewComponent = NewObject<USceneComponent>(GetComponentOwner(), *Node.Name);
-        NewComponent->SetupAttachment(NodeParentComponent);
-        NewComponent->RegisterComponent();
-        NewComponent->SetRelativeTransform(Node.Transform);
-        CustomAddInstanceComponent(NewComponent);
+		TRACE_CPUPROFILER_EVENT_SCOPE(AddSceneComponent);
+		NewComponent = NewObject<USceneComponent>(GetComponentOwner(), *Node.Name);
+		NewComponent->SetupAttachment(NodeParentComponent);
+		NewComponent->RegisterComponent();
+		NewComponent->SetRelativeTransform(Node.Transform);
+		CustomAddInstanceComponent(NewComponent);
 #else
-        NewComponent = NewObject<USceneComponent>(this, *Node.Name);
-        NewComponent->SetupAttachment(NodeParentComponent);
-        NewComponent->RegisterComponent();
-        NewComponent->SetRelativeTransform(Node.Transform);
-        AddInstanceComponent(NewComponent);
+		NewComponent = NewObject<USceneComponent>(this, GetSafeNodeName<USceneComponent>(Node));
+		NewComponent->SetupAttachment(NodeParentComponent);
+		NewComponent->RegisterComponent();
+		NewComponent->SetRelativeTransform(Node.Transform);
+		AddInstanceComponent(NewComponent);
 #endif
 	}
 	else
 	{
 #if 1 // WITH_DIRECTIVE
-        UE_LOG(LogTemp, Log, TEXT("ProcessNode: %s with transform [%s]"), *Node.Name, *Node.Transform.ToString());
+		UE_LOG(LogTemp, Log, TEXT("ProcessNode: %s with transform [%s]"), *Node.Name, *Node.Transform.ToString());
 #endif
-		if (Node.SkinIndex < 0)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
 		{
 #if 1 // WITH_DIRECTIVE
-            TRACE_CPUPROFILER_EVENT_SCOPE(AddStaticMeshComponent);
-            UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), *Node.Name);
-            StaticMeshComponent->SetupAttachment(NodeParentComponent);
-            StaticMeshComponent->RegisterComponent();
-            StaticMeshComponent->SetRelativeTransform(Node.Transform);
-            CustomAddInstanceComponent(StaticMeshComponent);
-            FglTFRuntimeParser::AddStaticMeshComponentReference(StaticMeshComponent);
+			TRACE_CPUPROFILER_EVENT_SCOPE(AddStaticMeshComponent);
+#endif
+			UStaticMeshComponent* StaticMeshComponent = nullptr;
+			TArray<FTransform> GPUInstancingTransforms;
+			if (Asset->GetNodeGPUInstancingTransforms(Node.Index, GPUInstancingTransforms))
+			{
+				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(this, GetSafeNodeName<UInstancedStaticMeshComponent>(Node));
+				for (const FTransform& GPUInstanceTransform : GPUInstancingTransforms)
+				{
+					InstancedStaticMeshComponent->AddInstance(GPUInstanceTransform);
+				}
+				StaticMeshComponent = InstancedStaticMeshComponent;
+			}
+			else
+			{
+#if 1 // WITH_DIRECTIVE
+				StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), GetSafeNodeName<UStaticMeshComponent>(Node));
 #else
-            UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, *Node.Name);
-            StaticMeshComponent->SetupAttachment(NodeParentComponent);
-            StaticMeshComponent->RegisterComponent();
-            StaticMeshComponent->SetRelativeTransform(Node.Transform);
-            AddInstanceComponent(StaticMeshComponent);
+				StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
+#endif
+			}
+			StaticMeshComponent->SetupAttachment(NodeParentComponent);
+			StaticMeshComponent->RegisterComponent();
+			StaticMeshComponent->SetRelativeTransform(Node.Transform);
+#if 1 // WITH_DIRECTIVE
+			CustomAddInstanceComponent(StaticMeshComponent);
+			FglTFRuntimeParser::AddStaticMeshComponentReference(StaticMeshComponent);
+#else
+			AddInstanceComponent(StaticMeshComponent);
 #endif
 
 #if 0 // WITH_DIRECTIVE
-            // The loaded static mesh might be cached somewhere for re-use
-            // so we shouldn't set its outer to the static mesh component, which would prevent the latter to be garbage collected!
-            if (StaticMeshConfig.Outer == nullptr)
-            {
-                StaticMeshConfig.Outer = StaticMeshComponent;
-            }
+			// The loaded static mesh might be cached somewhere for re-use
+			// so we shouldn't set its outer to the static mesh component, which would prevent the latter to be garbage collected!
+			if (StaticMeshConfig.Outer == nullptr)
+			{
+				StaticMeshConfig.Outer = StaticMeshComponent;
+			}
 #endif
 			UStaticMesh* StaticMesh = Asset->LoadStaticMesh(Node.MeshIndex, StaticMeshConfig);
 			if (StaticMesh && !StaticMeshConfig.ExportOriginalPivotToSocket.IsEmpty())
@@ -185,28 +212,32 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		else
 		{
 #if 1 // WITH_DIRECTIVE
-            TRACE_CPUPROFILER_EVENT_SCOPE(AddSkeletalMeshComponent);
-            USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
-            if (SkeletalMeshConfig.bBuildSimpleCollision)
-            {
-                SkeletalMeshComponent = NewObject<URigidBodySkeletalMeshComponent>(GetComponentOwner(), *Node.Name);
-            }
-            else
-            {
-                SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(GetComponentOwner(), *Node.Name);
-            }
-            SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
-            SkeletalMeshComponent->RegisterComponent();
-            SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
-            CustomAddInstanceComponent(SkeletalMeshComponent);
+			TRACE_CPUPROFILER_EVENT_SCOPE(AddSkeletalMeshComponent);
+			USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
+			if (SkeletalMeshConfig.bBuildSimpleCollision)
+			{
+				SkeletalMeshComponent = NewObject<URigidBodySkeletalMeshComponent>(GetComponentOwner(), *Node.Name);
+			}
+			else
+			{
+				SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(GetComponentOwner(), *Node.Name);
+			}
+			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
+			SkeletalMeshComponent->RegisterComponent();
+			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
+			CustomAddInstanceComponent(SkeletalMeshComponent);
 #else
-            USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, *Node.Name);
-            SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
-            SkeletalMeshComponent->RegisterComponent();
-            SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
-            AddInstanceComponent(SkeletalMeshComponent);
-#endif
-            USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
+			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, GetSafeNodeName<USkeletalMeshComponent>(Node));
+			SkeletalMeshComponent->SetupAttachment(NodeParentComponent);
+			SkeletalMeshComponent->RegisterComponent();
+			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
+			AddInstanceComponent(SkeletalMeshComponent);
+			if (SkeletalMeshConfig.Outer == nullptr)
+			{
+				SkeletalMeshConfig.Outer = SkeletalMeshComponent;
+			}
+#endif			
+			USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
 			SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
 			DiscoveredSkeletalMeshComponents.Add(SkeletalMeshComponent);
 			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
@@ -229,19 +260,40 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		}
 	}
 
-	// check for audio emitters
-	for (const int32 EmitterIndex : Node.EmitterIndices)
+
+	TArray<int32> EmitterIndices;
+	if (Asset->GetNodeExtensionIndices(Node.Index, "MSFT_audio_emitter", "emitters", EmitterIndices))
 	{
-		FglTFRuntimeAudioEmitter AudioEmitter;
-		if (Asset->LoadAudioEmitter(EmitterIndex, AudioEmitter))
+		// check for audio emitters
+		for (const int32 EmitterIndex : EmitterIndices)
 		{
-			UAudioComponent* AudioComponent = NewObject<UAudioComponent>(this, *AudioEmitter.Name);
-			AudioComponent->SetupAttachment(NewComponent);
-			AudioComponent->RegisterComponent();
-			AudioComponent->SetRelativeTransform(Node.Transform);
-			AddInstanceComponent(AudioComponent);
-			Asset->LoadEmitterIntoAudioComponent(AudioEmitter, AudioComponent);
-			AudioComponent->Play();
+			FglTFRuntimeAudioEmitter AudioEmitter;
+			if (Asset->LoadAudioEmitter(EmitterIndex, AudioEmitter))
+			{
+				UAudioComponent* AudioComponent = NewObject<UAudioComponent>(this, *AudioEmitter.Name);
+				AudioComponent->SetupAttachment(NewComponent);
+				AudioComponent->RegisterComponent();
+				AudioComponent->SetRelativeTransform(Node.Transform);
+				AddInstanceComponent(AudioComponent);
+				Asset->LoadEmitterIntoAudioComponent(AudioEmitter, AudioComponent);
+				AudioComponent->Play();
+			}
+		}
+	}
+
+	if (bAllowLights)
+	{
+		int32 LightIndex;
+		if (Asset->GetNodeExtensionIndex(Node.Index, "KHR_lights_punctual", "light", LightIndex))
+		{
+			ULightComponent* LightComponent = Asset->LoadPunctualLight(LightIndex, this, LightConfig);
+			if (LightComponent)
+			{
+				LightComponent->SetupAttachment(NewComponent);
+				LightComponent->RegisterComponent();
+				LightComponent->SetRelativeTransform(FTransform::Identity);
+				AddInstanceComponent(LightComponent);
+			}
 		}
 	}
 
@@ -251,7 +303,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		if (bAllowNodeAnimations)
 		{
 #if 1 // WITH_DIRECTIVE
-            TRACE_CPUPROFILER_EVENT_SCOPE(LoadAnimationCurves);
+			TRACE_CPUPROFILER_EVENT_SCOPE(LoadAnimationCurves);
 #endif
 			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
 			TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
@@ -270,22 +322,34 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 	else
 	{
+		USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
+		if (bAllowSkeletalAnimations)
+		{
 #if 1 // WITH_DIRECTIVE
-        TRACE_CPUPROFILER_EVENT_SCOPE(LoadSkeletalAnimations);
-        if (SkeletalMeshConfig.bLoadSkeletalAnimations)
+			TRACE_CPUPROFILER_EVENT_SCOPE(LoadSkeletalAnimations);
 #endif
-        {
-            USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(NewComponent);
-            FglTFRuntimeSkeletalAnimationConfig SkeletalAnimationConfig;
-            UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
-            if (SkeletalAnimation)
-            {
-                SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
-                SkeletalMeshComponent->AnimationData.bSavedLooping = true;
-                SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
-                SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-            }
-        }
+
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
+			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
+			if (!SkeletalAnimation && bAllowPoseAnimations)
+			{
+				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
+			}
+#else
+			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+			if (!SkeletalAnimation && bAllowPoseAnimations)
+			{
+				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->SkeletalMesh, SkeletalAnimationConfig, Node.SkinIndex);
+			}
+#endif
+			if (SkeletalAnimation)
+			{
+				SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
+				SkeletalMeshComponent->AnimationData.bSavedLooping = true;
+				SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
+				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			}
+		}
 	}
 
 	for (int32 ChildIndex : Node.ChildrenIndices)
@@ -369,17 +433,17 @@ void AglTFRuntimeAssetActor::ReceiveOnSkeletalMeshComponentCreated_Implementatio
 #if 1 // WITH_DIRECTIVE
 AActor* AglTFRuntimeAssetActor::GetComponentOwner()
 {
-    if (DelegateRootComponent)
-    {
-        return DelegateRootComponent->GetOwner();
-    }
-    else
-    {
-        return this;
-    }
+	if (DelegateRootComponent)
+	{
+		return DelegateRootComponent->GetOwner();
+	}
+	else
+	{
+		return this;
+	}
 }
 void AglTFRuntimeAssetActor::CustomAddInstanceComponent(UActorComponent* Component)
 {
-    GetComponentOwner()->AddInstanceComponent(Component);
+	GetComponentOwner()->AddInstanceComponent(Component);
 }
 #endif

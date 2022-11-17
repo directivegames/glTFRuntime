@@ -1,12 +1,12 @@
-// Copyright 2022, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
-#include "glTFRuntimeImageLoader.h"
 #include "IImageWrapperModule.h"
 #include "IImageWrapper.h"
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Math/UnrealMathUtility.h"
 #include "Modules/ModuleManager.h"
 
 #if 1 // WITH_DIRECTIVE
@@ -38,7 +38,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	}
 	else if (AlphaMode == "MASK")
 	{
-		RuntimeMaterial.bTranslucent = true;
+		RuntimeMaterial.bMasked = true;
 		double AlphaCutoffDouble;
 		if (!JsonMaterialObject->TryGetNumberField("alphaCutoff", AlphaCutoffDouble))
 		{
@@ -59,9 +59,17 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	{
 		RuntimeMaterial.MaterialType = EglTFRuntimeMaterialType::TwoSidedTranslucent;
 	}
+	if (RuntimeMaterial.bMasked && RuntimeMaterial.bTwoSided)
+	{
+		RuntimeMaterial.MaterialType = EglTFRuntimeMaterialType::TwoSidedMasked;
+	}
 	else if (RuntimeMaterial.bTranslucent)
 	{
 		RuntimeMaterial.MaterialType = EglTFRuntimeMaterialType::Translucent;
+	}
+	else if (RuntimeMaterial.bMasked)
+	{
+		RuntimeMaterial.MaterialType = EglTFRuntimeMaterialType::Masked;
 	}
 	else if (RuntimeMaterial.bTwoSided)
 	{
@@ -92,7 +100,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 		}
 	};
 
-	auto GetMaterialTexture = [this, MaterialsConfig](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const bool sRGB, UTexture2D*& ParamTextureCache, TArray<FglTFRuntimeMipMap>& ParamMips, int32& ParamTexCoord) -> const TSharedPtr<FJsonObject>
+	auto GetMaterialTexture = [this, MaterialsConfig](const TSharedRef<FJsonObject> JsonMaterialObject, const FString& ParamName, const bool sRGB, UTexture2D*& ParamTextureCache, TArray<FglTFRuntimeMipMap>& ParamMips, FglTFRuntimeTextureTransform& ParamTransform, FglTFRuntimeTextureSampler& Sampler) -> const TSharedPtr<FJsonObject>
 	{
 		const TSharedPtr<FJsonObject>* JsonTextureObject;
 		if (JsonMaterialObject->TryGetObjectField(ParamName, JsonTextureObject))
@@ -103,18 +111,31 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				return nullptr;
 			}
 
-			if (!(*JsonTextureObject)->TryGetNumberField("texCoord", ParamTexCoord))
+			if (!(*JsonTextureObject)->TryGetNumberField("texCoord", ParamTransform.TexCoord))
 			{
-				ParamTexCoord = 0;
+				ParamTransform.TexCoord = 0;
 			}
 
-			if (ParamTexCoord < 0 || ParamTexCoord > 3)
+			ParamTransform.Rotation = (1.0 / (PI * 2)) * GetJsonExtensionObjectNumber(JsonTextureObject->ToSharedRef(), "KHR_texture_transform", "rotation", 0) * -1;
+			TArray<double> Offset = GetJsonExtensionObjectNumbers(JsonTextureObject->ToSharedRef(), "KHR_texture_transform", "offset");
+			if (Offset.Num() >= 2)
 			{
-				AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for %s: %d"), *ParamName, ParamTexCoord));
+				ParamTransform.Offset = FLinearColor(Offset[0], Offset[1], 0, 0);
+			}
+			TArray<double> Scale = GetJsonExtensionObjectNumbers(JsonTextureObject->ToSharedRef(), "KHR_texture_transform", "scale");
+			if (Scale.Num() >= 2)
+			{
+				ParamTransform.Scale = FLinearColor(Scale[0], Scale[1], 1, 1);
+			}
+			ParamTransform.TexCoord = GetJsonExtensionObjectIndex(JsonTextureObject->ToSharedRef(), "KHR_texture_transform", "texCoord", ParamTransform.TexCoord);
+
+			if (ParamTransform.TexCoord < 0 || ParamTransform.TexCoord > 3)
+			{
+				AddError("LoadMaterial_Internal()", FString::Printf(TEXT("Invalid UV Set for %s: %d"), *ParamName, ParamTransform.TexCoord));
 				return nullptr;
 			}
 
-			ParamTextureCache = LoadTexture(TextureIndex, ParamMips, sRGB, MaterialsConfig);
+			ParamTextureCache = LoadTexture(TextureIndex, ParamMips, sRGB, MaterialsConfig, Sampler);
 			return *JsonTextureObject;
 		}
 		return nullptr;
@@ -124,7 +145,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	if (JsonMaterialObject->TryGetObjectField("pbrMetallicRoughness", JsonPBRObject))
 	{
 		GetMaterialVector(JsonPBRObject->ToSharedRef(), "baseColorFactor", 4, RuntimeMaterial.bHasBaseColorFactor, RuntimeMaterial.BaseColorFactor);
-		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "baseColorTexture", true, RuntimeMaterial.BaseColorTextureCache, RuntimeMaterial.BaseColorTextureMips, RuntimeMaterial.BaseColorTexCoord);
+		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "baseColorTexture", true, RuntimeMaterial.BaseColorTextureCache, RuntimeMaterial.BaseColorTextureMips, RuntimeMaterial.BaseColorTransform, RuntimeMaterial.BaseColorSampler);
 
 		if ((*JsonPBRObject)->TryGetNumberField("metallicFactor", RuntimeMaterial.MetallicFactor))
 		{
@@ -136,19 +157,19 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			RuntimeMaterial.bHasRoughnessFactor = true;
 		}
 
-		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "metallicRoughnessTexture", false, RuntimeMaterial.MetallicRoughnessTextureCache, RuntimeMaterial.MetallicRoughnessTextureMips, RuntimeMaterial.MetallicRoughnessTexCoord);
+		GetMaterialTexture(JsonPBRObject->ToSharedRef(), "metallicRoughnessTexture", false, RuntimeMaterial.MetallicRoughnessTextureCache, RuntimeMaterial.MetallicRoughnessTextureMips, RuntimeMaterial.MetallicRoughnessTransform, RuntimeMaterial.MetallicRoughnessSampler);
 	}
 
-	if (const TSharedPtr<FJsonObject> JsonNormalTexture = GetMaterialTexture(JsonMaterialObject, "normalTexture", false, RuntimeMaterial.NormalTextureCache, RuntimeMaterial.NormalTextureMips, RuntimeMaterial.NormalTexCoord))
+	if (const TSharedPtr<FJsonObject> JsonNormalTexture = GetMaterialTexture(JsonMaterialObject, "normalTexture", false, RuntimeMaterial.NormalTextureCache, RuntimeMaterial.NormalTextureMips, RuntimeMaterial.NormalTransform, RuntimeMaterial.NormalSampler))
 	{
 		JsonNormalTexture->TryGetNumberField("scale", RuntimeMaterial.NormalTextureScale);
 	}
 
-	GetMaterialTexture(JsonMaterialObject, "occlusionTexture", false, RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips, RuntimeMaterial.OcclusionTexCoord);
+	GetMaterialTexture(JsonMaterialObject, "occlusionTexture", false, RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips, RuntimeMaterial.OcclusionTransform, RuntimeMaterial.OcclusionSampler);
 
 	GetMaterialVector(JsonMaterialObject, "emissiveFactor", 3, RuntimeMaterial.bHasEmissiveFactor, RuntimeMaterial.EmissiveFactor);
 
-	GetMaterialTexture(JsonMaterialObject, "emissiveTexture", true, RuntimeMaterial.EmissiveTextureCache, RuntimeMaterial.EmissiveTextureMips, RuntimeMaterial.EmissiveTexCoord);
+	GetMaterialTexture(JsonMaterialObject, "emissiveTexture", true, RuntimeMaterial.EmissiveTextureCache, RuntimeMaterial.EmissiveTextureMips, RuntimeMaterial.EmissiveTransform, RuntimeMaterial.EmissiveSampler);
 
 	const TSharedPtr<FJsonObject>* JsonExtensions;
 	if (JsonMaterialObject->TryGetObjectField("extensions", JsonExtensions))
@@ -158,7 +179,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_pbrSpecularGlossiness", JsonPbrSpecularGlossiness))
 		{
 			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseFactor", 4, RuntimeMaterial.bHasDiffuseFactor, RuntimeMaterial.DiffuseFactor);
-			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseTexture", true, RuntimeMaterial.DiffuseTextureCache, RuntimeMaterial.DiffuseTextureMips, RuntimeMaterial.DiffuseTexCoord);
+			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "diffuseTexture", true, RuntimeMaterial.DiffuseTextureCache, RuntimeMaterial.DiffuseTextureMips, RuntimeMaterial.DiffuseTransform, RuntimeMaterial.DiffuseSampler);
 
 			GetMaterialVector(JsonPbrSpecularGlossiness->ToSharedRef(), "specularFactor", 3, RuntimeMaterial.bHasSpecularFactor, RuntimeMaterial.SpecularFactor);
 
@@ -167,7 +188,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				RuntimeMaterial.bHasGlossinessFactor = true;
 			}
 
-			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "specularGlossinessTexture", true, RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips, RuntimeMaterial.SpecularGlossinessTexCoord);
+			GetMaterialTexture(JsonPbrSpecularGlossiness->ToSharedRef(), "specularGlossinessTexture", true, RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips, RuntimeMaterial.SpecularGlossinessTransform, RuntimeMaterial.SpecularGlossinessSampler);
 
 			RuntimeMaterial.bKHR_materials_pbrSpecularGlossiness = true;
 		}
@@ -180,9 +201,37 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			{
 				RuntimeMaterial.bHasTransmissionFactor = true;
 			}
-			GetMaterialTexture(JsonMaterialTransmission->ToSharedRef(), "transmissionTexture", false, RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips, RuntimeMaterial.TransmissionTexCoord);
+			GetMaterialTexture(JsonMaterialTransmission->ToSharedRef(), "transmissionTexture", false, RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips, RuntimeMaterial.TransmissionTransform, RuntimeMaterial.TransmissionSampler);
 
 			RuntimeMaterial.bKHR_materials_transmission = true;
+		}
+
+		// KHR_materials_unlit 
+		const TSharedPtr<FJsonObject>* JsonMaterialUnlit;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_unlit", JsonMaterialUnlit))
+		{
+			RuntimeMaterial.bKHR_materials_unlit = true;
+		}
+
+		// KHR_materials_ior
+		const TSharedPtr<FJsonObject>* JsonMaterialIOR;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_ior", JsonMaterialIOR))
+		{
+			if (!(*JsonMaterialIOR)->TryGetNumberField("ior", RuntimeMaterial.IOR))
+			{
+				RuntimeMaterial.IOR = 1.5;
+			}
+			RuntimeMaterial.bHasIOR = true;
+		}
+
+		// KHR_materials_specular
+		const TSharedPtr<FJsonObject>* JsonMaterialSpecular;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_specular", JsonMaterialSpecular))
+		{
+			if (!(*JsonMaterialSpecular)->TryGetNumberField("specularFactor", RuntimeMaterial.BaseSpecularFactor))
+			{
+				RuntimeMaterial.BaseSpecularFactor = 1;
+			}
 		}
 	}
 
@@ -207,7 +256,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 	return Material;
 }
 
-UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig)
+UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeImagesConfig& ImagesConfig, const FglTFRuntimeTextureSampler& Sampler)
 {
 #if 1 // WITH_DIRECTIVE
     TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildTexture);
@@ -229,6 +278,8 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 #else
 	Texture->PlatformData = PlatformData;
 #endif
+
+	Texture->NeverStream = true;
 
 	for (const FglTFRuntimeMipMap& MipMap : Mips)
 	{
@@ -267,6 +318,19 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	Texture->CompressionSettings = ImagesConfig.Compression;
 	Texture->LODGroup = ImagesConfig.Group;
 	Texture->SRGB = ImagesConfig.bSRGB;
+
+	if (Sampler.MinFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MinFilter;
+	}
+
+	if (Sampler.MagFilter != TextureFilter::TF_Default)
+	{
+		Texture->Filter = Sampler.MagFilter;
+	}
+
+	Texture->AddressX = Sampler.TileX;
+	Texture->AddressY = Sampler.TileY;
 
 	Texture->UpdateResource();
     
@@ -343,6 +407,22 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
     }
 #endif
 
+	if (RuntimeMaterial.bKHR_materials_transmission)
+	{
+		if (TransmissionMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = TransmissionMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+
+	if (RuntimeMaterial.bKHR_materials_unlit)
+	{
+		if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = UnlitMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+
 	if (MaterialsConfig.UberMaterialsOverrideMap.Contains(RuntimeMaterial.MaterialType))
 	{
 		BaseMaterial = MaterialsConfig.UberMaterialsOverrideMap[RuntimeMaterial.MaterialType];
@@ -360,7 +440,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 
 	if (!BaseMaterial)
 	{
-		return nullptr;
+		AddError("BuildMaterial()", "Unable to find glTFRuntime Material, ensure it has been packaged, falling back to default material");
+		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
 	}
 
 #if 1 // WITH_DIRECTIVE
@@ -371,7 +452,8 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
     
 	if (!Material)
 	{
-		return nullptr;
+		AddError("BuildMaterial()", "Unable to create material instance, falling back to default material");
+		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
 	}
 
 	// make it public to allow exports
@@ -397,7 +479,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	};
 
-	auto ApplyMaterialTexture = [this, Material, MaterialsConfig](const FName& TextureName, UTexture2D* TextureCache, const TArray<FglTFRuntimeMipMap>& Mips, const FName& TexCoordName, const int32 TexCoord, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB)
+	auto ApplyMaterialTexture = [this, Material, MaterialsConfig](const FName& TextureName, UTexture2D* TextureCache, const TArray<FglTFRuntimeMipMap>& Mips, const FglTFRuntimeTextureSampler& Sampler, const FString& TransformPrefix, const FglTFRuntimeTextureTransform& Transform, const TEnumAsByte<TextureCompressionSettings> Compression, const bool sRGB)
 	{
 		UTexture2D* Texture = TextureCache;
 		if (!Texture)
@@ -407,43 +489,51 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 				FglTFRuntimeImagesConfig ImagesConfig = MaterialsConfig.ImagesConfig;
 				ImagesConfig.Compression = Compression;
 				ImagesConfig.bSRGB = sRGB;
-				Texture = BuildTexture(Material, Mips, ImagesConfig);
+				Texture = BuildTexture(Material, Mips, ImagesConfig, Sampler);
 			}
 		}
 		if (Texture)
 		{
 			Material->SetTextureParameterValue(TextureName, Texture);
 			FVector4 UVSet = FVector4(0, 0, 0, 0);
-			UVSet[TexCoord] = 1;
-			Material->SetVectorParameterValue(TexCoordName, FLinearColor(UVSet));
+			UVSet[Transform.TexCoord] = 1;
+			Material->SetVectorParameterValue(FName(TransformPrefix + "TexCoord"), FLinearColor(UVSet));
+			Material->SetVectorParameterValue(FName(TransformPrefix + "Offset"), Transform.Offset);
+			Material->SetScalarParameterValue(FName(TransformPrefix + "Rotation"), Transform.Rotation);
+			Material->SetVectorParameterValue(FName(TransformPrefix + "Scale"), Transform.Scale);
 		}
 	};
 
 	ApplyMaterialFactor(RuntimeMaterial.bHasBaseColorFactor, "baseColorFactor", RuntimeMaterial.BaseColorFactor);
 	ApplyMaterialTexture("baseColorTexture", RuntimeMaterial.BaseColorTextureCache, RuntimeMaterial.BaseColorTextureMips,
-		"baseColorTexCoord", RuntimeMaterial.BaseColorTexCoord,
+		RuntimeMaterial.BaseColorSampler,
+		"baseColor", RuntimeMaterial.BaseColorTransform,
 		TextureCompressionSettings::TC_Default, true);
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bHasMetallicFactor, "metallicFactor", RuntimeMaterial.MetallicFactor);
 	ApplyMaterialFloatFactor(RuntimeMaterial.bHasRoughnessFactor, "roughnessFactor", RuntimeMaterial.RoughnessFactor);
 
 	ApplyMaterialTexture("metallicRoughnessTexture", RuntimeMaterial.MetallicRoughnessTextureCache, RuntimeMaterial.MetallicRoughnessTextureMips,
-		"metallicRoughnessTexCoord", RuntimeMaterial.MetallicRoughnessTexCoord,
+		RuntimeMaterial.MetallicRoughnessSampler,
+		"metallicRoughness", RuntimeMaterial.MetallicRoughnessTransform,
 		TextureCompressionSettings::TC_Default, false);
 
 	ApplyMaterialTexture("normalTexture", RuntimeMaterial.NormalTextureCache, RuntimeMaterial.NormalTextureMips,
-		"normalTexCoord", RuntimeMaterial.NormalTexCoord,
+		RuntimeMaterial.NormalSampler,
+		"normal", RuntimeMaterial.NormalTransform,
 		TextureCompressionSettings::TC_Normalmap, false);
 	ApplyMaterialFactor(true, "normalTexScale", FLinearColor(RuntimeMaterial.NormalTextureScale, RuntimeMaterial.NormalTextureScale, 1, 1));
 
 	ApplyMaterialTexture("occlusionTexture", RuntimeMaterial.OcclusionTextureCache, RuntimeMaterial.OcclusionTextureMips,
-		"occlusionTexCoord", RuntimeMaterial.OcclusionTexCoord,
+		RuntimeMaterial.OcclusionSampler,
+		"occlusion", RuntimeMaterial.OcclusionTransform,
 		TextureCompressionSettings::TC_Default, false);
 
 	ApplyMaterialFactor(RuntimeMaterial.bHasEmissiveFactor, "emissiveFactor", RuntimeMaterial.EmissiveFactor);
 
 	ApplyMaterialTexture("emissiveTexture", RuntimeMaterial.EmissiveTextureCache, RuntimeMaterial.EmissiveTextureMips,
-		"emissiveTexCoord", RuntimeMaterial.EmissiveTexCoord,
+		RuntimeMaterial.EmissiveSampler,
+		"emissive", RuntimeMaterial.EmissiveTransform,
 		TextureCompressionSettings::TC_Default, true);
 
 
@@ -451,13 +541,15 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	{
 		ApplyMaterialFactor(RuntimeMaterial.bHasDiffuseFactor, "baseColorFactor", RuntimeMaterial.DiffuseFactor);
 		ApplyMaterialTexture("baseColorTexture", RuntimeMaterial.DiffuseTextureCache, RuntimeMaterial.DiffuseTextureMips,
-			"baseColorTexCoord", RuntimeMaterial.DiffuseTexCoord,
+			RuntimeMaterial.DiffuseSampler,
+			"baseColor", RuntimeMaterial.DiffuseTransform,
 			TextureCompressionSettings::TC_Default, true);
 
 		ApplyMaterialFactor(RuntimeMaterial.bHasSpecularFactor, "specularFactor", RuntimeMaterial.SpecularFactor);
 		ApplyMaterialFloatFactor(RuntimeMaterial.bHasGlossinessFactor, "glossinessFactor", RuntimeMaterial.GlossinessFactor);
 		ApplyMaterialTexture("specularGlossinessTexture", RuntimeMaterial.SpecularGlossinessTextureCache, RuntimeMaterial.SpecularGlossinessTextureMips,
-			"specularGlossinessTexCoord", RuntimeMaterial.SpecularGlossinessTexCoord,
+			RuntimeMaterial.SpecularGlossinessSampler,
+			"specularGlossiness", RuntimeMaterial.SpecularGlossinessTransform,
 			TextureCompressionSettings::TC_Default, false);
 	}
 
@@ -465,11 +557,15 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	{
 		ApplyMaterialFloatFactor(RuntimeMaterial.bHasTransmissionFactor, "transmissionFactor", RuntimeMaterial.TransmissionFactor);
 		ApplyMaterialTexture("transmissionTexture", RuntimeMaterial.TransmissionTextureCache, RuntimeMaterial.TransmissionTextureMips,
-			"transmissionTexCoord", RuntimeMaterial.TransmissionTexCoord,
+			RuntimeMaterial.TransmissionSampler,
+			"transmission", RuntimeMaterial.TransmissionTransform,
 			TextureCompressionSettings::TC_Default, false);
 	}
 
 	Material->SetScalarParameterValue("bUseVertexColors", (bUseVertexColors && !MaterialsConfig.bDisableVertexColors) ? 1.0f : 0.0f);
+	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.bMasked ? 1.0f : 0.0f);
+
+	ApplyMaterialFloatFactor(RuntimeMaterial.bHasIOR, "ior", RuntimeMaterial.IOR);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
 	{
@@ -486,6 +582,48 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	}
 
 	return Material;
+}
+
+bool FglTFRuntimeParser::LoadImageFromBlob(TArray64<uint8>& Blob, TSharedRef<FJsonObject> JsonImageObject, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig)
+{
+	OnTexturePixels.Broadcast(AsShared(), JsonImageObject, Blob, Width, Height, UncompressedBytes);
+
+	if (UncompressedBytes.Num() > 0)
+	{
+		return true;
+	}
+
+	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+
+	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Blob.GetData(), Blob.Num());
+	if (ImageFormat == EImageFormat::Invalid)
+	{
+		AddError("LoadImageFromBlob()", "Unable to detect image format");
+		return false;
+	}
+
+	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
+	if (!ImageWrapper.IsValid())
+	{
+		AddError("LoadImageFromBlob()", "Unable to create ImageWrapper");
+		return false;
+	}
+	if (!ImageWrapper->SetCompressed(Blob.GetData(), Blob.Num()))
+	{
+		AddError("LoadImageFromBlob()", "Unable to parse image data");
+		return false;
+	}
+
+	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
+	{
+		AddError("LoadImageFromBlob()", "Unable to get raw image data");
+		return false;
+	}
+
+	Width = ImageWrapper->GetWidth();
+	Height = ImageWrapper->GetHeight();
+
+	return true;
 }
 
 bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& UncompressedBytes, int32& Width, int32& Height, const FglTFRuntimeImagesConfig& ImagesConfig)
@@ -505,60 +643,10 @@ bool FglTFRuntimeParser::LoadImage(const int32 ImageIndex, TArray64<uint8>& Unco
 		return false;
 	}
 
-	for (TSubclassOf<UglTFRuntimeImageLoader> ImageLoaderClass : ImagesConfig.AdditionalImageLoaders)
-	{
-		// maybe overengineering but avoids custom loaders making mess
-		UncompressedBytes.Empty();
-		Width = 0;
-		Height = 0;
-		UglTFRuntimeImageLoader* ImageLoader = NewObject<UglTFRuntimeImageLoader>(GetTransientPackage(), ImageLoaderClass);
-		if (ImageLoader)
-		{
-			if (ImageLoader->LoadImage(AsShared(), ImageIndex, JsonImageObject.ToSharedRef(), Bytes, UncompressedBytes, Width, Height))
-			{
-				return true;
-			}
-		}
-		else
-		{
-			AddError("LoadImage()", FString::Printf(TEXT("Unable to instantiate glTFRuntimeImageLoader %s"), *ImageLoaderClass->GetName()));
-		}
-	}
-
-	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
-
-	EImageFormat ImageFormat = ImageWrapperModule.DetectImageFormat(Bytes.GetData(), Bytes.Num());
-	if (ImageFormat == EImageFormat::Invalid)
-	{
-		AddError("LoadImage()", "Unable to detect image format");
-		return false;
-	}
-
-	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImageFormat);
-	if (!ImageWrapper.IsValid())
-	{
-		AddError("LoadImage()", "Unable to create ImageWrapper");
-		return false;
-	}
-	if (!ImageWrapper->SetCompressed(Bytes.GetData(), Bytes.Num()))
-	{
-		AddError("LoadImage()", "Unable to parse image data");
-		return false;
-	}
-
-	if (!ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
-	{
-		AddError("LoadImage()", "Unable to get raw image data");
-		return false;
-	}
-
-	Width = ImageWrapper->GetWidth();
-	Height = ImageWrapper->GetHeight();
-
-	return true;
+	return LoadImageFromBlob(Bytes, JsonImageObject.ToSharedRef(), UncompressedBytes, Width, Height, ImagesConfig);
 }
 
-UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<FglTFRuntimeMipMap>& Mips, const bool sRGB, const FglTFRuntimeMaterialsConfig& MaterialsConfig, FglTFRuntimeTextureSampler& Sampler)
 {
 #if 1 // WITH_DIRECTIVE
     TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadTexture);
@@ -613,7 +701,7 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 	}
 
 	TArray64<uint8> UncompressedBytes;
-	EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
+	constexpr EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
 	int32 Width = 0;
 	int32 Height = 0;
 	if (!LoadImage(ImageIndex, UncompressedBytes, Width, Height, MaterialsConfig.ImagesConfig))
@@ -621,10 +709,26 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 		return nullptr;
 	}
 
+	OnLoadedTexturePixels.Broadcast(AsShared(), JsonTextureObject.ToSharedRef(), Width, Height, reinterpret_cast<FColor*>(UncompressedBytes.GetData()));
+
 	if (Width > 0 && Height > 0 &&
 		(Width % GPixelFormats[PixelFormat].BlockSizeX) == 0 &&
 		(Height % GPixelFormats[PixelFormat].BlockSizeY) == 0)
 	{
+
+		// limit image size
+		if (MaterialsConfig.ImagesConfig.MaxWidth > 0 || MaterialsConfig.ImagesConfig.MaxHeight > 0)
+		{
+			const int32 NewWidth = MaterialsConfig.ImagesConfig.MaxWidth > 0 ? MaterialsConfig.ImagesConfig.MaxWidth : Width;
+			const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
+			TArray64<FColor> ResizedPixels;
+			ResizedPixels.AddUninitialized(NewWidth * NewHeight);
+			FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB, false);
+			Width = NewWidth;
+			Height = NewHeight;
+			UncompressedBytes.Empty(ResizedPixels.Num() * 4);
+			UncompressedBytes.Append(reinterpret_cast<uint8*>(ResizedPixels.GetData()), ResizedPixels.Num() * 4);
+		}
 
 		int32 NumOfMips = 1;
 
@@ -682,6 +786,71 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 			MipHeight = FMath::Max(MipHeight / 2, 1);
 		}
 
+	}
+
+	int64 SamplerIndex;
+	if (JsonTextureObject->TryGetNumberField("sampler", SamplerIndex))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
+		// no samplers ?
+		if (!Root->TryGetArrayField("samplers", JsonSamplers))
+		{
+			UE_LOG(LogGLTFRuntime, Warning, TEXT("No texture sampler defined!"));
+		}
+		else
+		{
+			if (SamplerIndex >= JsonSamplers->Num())
+			{
+				UE_LOG(LogGLTFRuntime, Warning, TEXT("Invalid texture sampler index: %lld"), SamplerIndex);
+			}
+			else
+			{
+				TSharedPtr<FJsonObject> JsonSamplerObject = (*JsonSamplers)[SamplerIndex]->AsObject();
+				if (JsonSamplerObject)
+				{
+					int64 MinFilter;
+					if (JsonSamplerObject->TryGetNumberField("minFilter", MinFilter))
+					{
+						if (MinFilter == 9728)
+						{
+							Sampler.MinFilter = TextureFilter::TF_Nearest;
+						}
+					}
+					int64 MagFilter;
+					if (JsonSamplerObject->TryGetNumberField("magFilter", MagFilter))
+					{
+						if (MagFilter == 9728)
+						{
+							Sampler.MagFilter = TextureFilter::TF_Nearest;
+						}
+					}
+					int64 WrapS;
+					if (JsonSamplerObject->TryGetNumberField("wrapS", WrapS))
+					{
+						if (WrapS == 33071)
+						{
+							Sampler.TileX = TextureAddress::TA_Clamp;
+						}
+						else if (WrapS == 33648)
+						{
+							Sampler.TileX = TextureAddress::TA_Mirror;
+						}
+					}
+					int64 WrapT;
+					if (JsonSamplerObject->TryGetNumberField("wrapT", WrapT))
+					{
+						if (WrapT == 33071)
+						{
+							Sampler.TileY = TextureAddress::TA_Clamp;
+						}
+						else if (WrapT == 33648)
+						{
+							Sampler.TileY = TextureAddress::TA_Mirror;
+						}
+					}
+				}
+			}
+		}
 	}
 
 	return nullptr;
@@ -747,6 +916,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial(const int32 Index, const Fg
 	UMaterialInterface* Material = LoadMaterial_Internal(Index, MaterialName, JsonMaterialObject.ToSharedRef(), MaterialsConfig, bUseVertexColors);
 	if (!Material)
 	{
+		AddError("LoadMaterial()", "Unable to load material");
 		return nullptr;
 	}
 

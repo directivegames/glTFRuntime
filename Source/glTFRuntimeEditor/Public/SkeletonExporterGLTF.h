@@ -4,12 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Exporters/Exporter.h"
-
-#if 1 // WITH_DIRECTIVE
-#include "Json.h"
-#endif
-
+#include "Dom/JsonObject.h"
 #include "SkeletonExporterGLTF.generated.h"
+
+class USkeleton;
 
 class FglTFExportContext
 {
@@ -33,7 +31,7 @@ protected:
 class FglTFExportContextSkeleton : public FglTFExportContext
 {
 public:
-	void GenerateSkeleton(const USkeleton* Skeleton);
+	void GenerateSkeleton(USkeleton* Skeleton);
 protected:
 	void GetSkeletonBoneChildren(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex, TArray<int32>& BoneChildrenIndices);
 	FMatrix BuildBoneFullMatrix(const FReferenceSkeleton& SkeletonRef, const int32 ParentBoneIndex);

@@ -1,4 +1,4 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2020-2022, Roberto De Ioris.
 
 #include "glTFRuntimeParser.h"
 #if ENGINE_MAJOR_VERSION > 4
@@ -13,16 +13,21 @@
 #include "IMeshBuilderModule.h"
 #include "LODUtilities.h"
 #include "MeshUtilities.h"
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
+#include "AssetRegistry/AssetRegistryModule.h"
+#else
 #include "AssetRegistryModule.h"
+#endif
 #endif
 #include "Engine/SkeletalMeshSocket.h"
 #include "glTFAnimBoneCompressionCodec.h"
-#include "Animation/AnimCurveCompressionCodec_CompressedRichCurve.h"
+#include "glTFAnimCurveCompressionCodec.h"
 #include "Model.h"
 #include "Animation/MorphTarget.h"
 #include "Async/Async.h"
 #include "Animation/AnimCurveTypes.h"
 #include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/PhysicsConstraintTemplate.h"
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 #include "UObject/SavePackage.h"
 #endif
@@ -113,6 +118,24 @@ void FglTFRuntimeParser::ApplySkeletonBoneRotation(FReferenceSkeletonModifier& M
 	}
 }
 
+void FglTFRuntimeParser::AddSkeletonDeltaTranforms(FReferenceSkeleton& RefSkeleton, const TMap<FString, FTransform>& Transforms)
+{
+	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
+	const TArray<FTransform>& BonesTransforms = Modifier.GetReferenceSkeleton().GetRefBonePose();
+
+	for (const TPair<FString, FTransform>& Pair : Transforms)
+	{
+		const int32 BoneIndex = RefSkeleton.FindBoneIndex(*Pair.Key);
+		if (BoneIndex <= INDEX_NONE)
+		{
+			continue;
+		}
+		FTransform Transform = BonesTransforms[BoneIndex];
+		Transform.Accumulate(Pair.Value);
+		Modifier.UpdateRefPoseTransform(BoneIndex, Transform);
+	}
+}
+
 void FglTFRuntimeParser::CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkeleton, const FReferenceSkeleton& SrcRefSkeleton)
 {
 	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
@@ -169,9 +192,9 @@ void FglTFRuntimeParser::CopySkeletonRotationsFrom(FReferenceSkeleton& RefSkelet
 USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
 #if 1 // WITH_DIRECTIVE
-    TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::CreateSkeletalMeshFromLODs);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::CreateSkeletalMeshFromLODs);
 #endif
-    
+
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	SkeletalMeshContext->SkeletalMesh->SetEnablePerPolyCollision(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision);
 #else
@@ -229,14 +252,27 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		CopySkeletonRotationsFrom(RefSkeleton, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
 	}
 
-	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton && SkeletalMeshContext->SkeletalMeshConfig.bOverwriteRefSkeleton)
+	if (SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.BonesDeltaTransformMap.Num() > 0)
 	{
-#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
-		SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton());
-#else
-		SkeletalMeshContext->SkeletalMesh->RefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
-#endif
+		AddSkeletonDeltaTranforms(RefSkeleton, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig.BonesDeltaTransformMap);
 	}
+
+	if (SkeletalMeshContext->SkeletalMeshConfig.Skeleton)
+	{
+		if (SkeletalMeshContext->SkeletalMeshConfig.bOverwriteRefSkeleton)
+		{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+			SkeletalMeshContext->SkeletalMesh->SetRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton());
+#else
+			SkeletalMeshContext->SkeletalMesh->RefSkeleton = SkeletalMeshContext->SkeletalMeshConfig.Skeleton->GetReferenceSkeleton();
+#endif
+		}
+		else if (SkeletalMeshContext->SkeletalMeshConfig.bAddVirtualBones)
+		{
+			RefSkeleton.RebuildRefSkeleton(SkeletalMeshContext->SkeletalMeshConfig.Skeleton, false);
+		}
+	}
+
 
 	TMap<int32, int32> MainBonesCache;
 	int32 MatIndex = 0;
@@ -248,7 +284,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 	FSkeletalMeshModel* ImportedResource = SkeletalMeshContext->SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
 
-	for (FglTFRuntimeLOD& LOD : SkeletalMeshContext->LODs)
+	for (FglTFRuntimeSkeletalMeshLOD& LOD : SkeletalMeshContext->LODs)
 	{
 
 		TArray<SkeletalMeshImportData::FVertex> Wedges;
@@ -261,7 +297,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		TArray<FVector> Points;
 #endif
 
-		for (FglTFRuntimePrimitive& Primitive : LOD.Primitives)
+		for (FglTFRuntimePrimitive& Primitive : LOD.RuntimeLOD->Primitives)
 		{
 			int32 Base = Points.Num();
 			Points.Append(Primitive.Positions);
@@ -462,7 +498,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			TMap<FString, int32> MorphTargetNamesHistory;
 			TMap<FString, int32> MorphTargetNamesDuplicateCounter;
 
-			for (FglTFRuntimePrimitive& Primitive : LOD.Primitives)
+			for (FglTFRuntimePrimitive& Primitive : LOD.RuntimeLOD->Primitives)
 			{
 				for (FglTFRuntimeMorphTarget& MorphTarget : Primitive.MorphTargets)
 				{
@@ -567,20 +603,21 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 	SkeletalMeshContext->SkeletalMesh->AllocateResourceForRendering();
 
-	for (FglTFRuntimeLOD& LOD : SkeletalMeshContext->LODs)
+	for (FglTFRuntimeSkeletalMeshLOD& LOD : SkeletalMeshContext->LODs)
 	{
 		FSkeletalMeshLODRenderData* LodRenderData = new FSkeletalMeshLODRenderData();
 		int32 LODIndex = SkeletalMeshContext->SkeletalMesh->GetResourceForRendering()->LODRenderData.Add(LodRenderData);
 
-		LodRenderData->RenderSections.SetNumUninitialized(LOD.Primitives.Num());
+		LodRenderData->RenderSections.SetNumUninitialized(LOD.RuntimeLOD->Primitives.Num());
 
 		int32 NumIndices = 0;
-		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.Primitives.Num(); PrimitiveIndex++)
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.RuntimeLOD->Primitives.Num(); PrimitiveIndex++)
 		{
-			NumIndices += LOD.Primitives[PrimitiveIndex].Indices.Num();
+			NumIndices += LOD.RuntimeLOD->Primitives[PrimitiveIndex].Indices.Num();
 		}
 
 		LodRenderData->StaticVertexBuffers.PositionVertexBuffer.Init(NumIndices);
+		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.SetUseFullPrecisionUVs(SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionUVs);
 		LodRenderData->StaticVertexBuffers.StaticMeshVertexBuffer.Init(NumIndices, 1);
 
 		int32 NumBones = RefSkeleton.GetNum();
@@ -597,9 +634,9 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 		int32 TotalVertexIndex = 0;
 		int32 Base = 0;
 
-		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.Primitives.Num(); PrimitiveIndex++)
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < LOD.RuntimeLOD->Primitives.Num(); PrimitiveIndex++)
 		{
-			FglTFRuntimePrimitive& Primitive = LOD.Primitives[PrimitiveIndex];
+			FglTFRuntimePrimitive& Primitive = LOD.RuntimeLOD->Primitives[PrimitiveIndex];
 
 			new(&LodRenderData->RenderSections[PrimitiveIndex]) FSkelMeshRenderSection();
 			FSkelMeshRenderSection& MeshSection = LodRenderData->RenderSections[PrimitiveIndex];
@@ -899,6 +936,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 			}
 		}
 
+		LodRenderData->SkinWeightVertexBuffer.SetNeedsCPUAccess(SkeletalMeshContext->SkeletalMeshConfig.bPerPolyCollision);
 		LodRenderData->SkinWeightVertexBuffer.SetMaxBoneInfluences(4);
 		LodRenderData->SkinWeightVertexBuffer = InWeights;
 		LodRenderData->MultiSizeIndexContainer.CreateIndexBuffer(sizeof(uint32_t));
@@ -916,10 +954,10 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext)
 {
 #if 1 // WITH_DIRECTIVE
-    TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs);
-    LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::FinalizeSkeletalMesh);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs);
+	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::FinalizeSkeletalMesh);
 #endif
-    
+
 #if !WITH_EDITOR
 	bool bHasMorphTargets = false;
 	int32 MorphTargetIndex = 0;
@@ -927,10 +965,6 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 	for (int32 LODIndex = 0; LODIndex < SkeletalMeshContext->LODs.Num(); LODIndex++)
 	{
-#if 1 // WITH_DIRECTIVE
-        TRACE_CPUPROFILER_EVENT_SCOPE(SaveLODImportedData);
-#endif
-        
 #if WITH_EDITOR
 		SkeletalMeshContext->SkeletalMesh->SaveLODImportedData(LODIndex, SkeletalMeshContext->LODs[LODIndex].ImportData);
 #endif
@@ -942,6 +976,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		LODInfo.ReductionSettings.MaxDeviationPercentage = 0.0f;
 		LODInfo.BuildSettings.bRecomputeNormals = false; // do not force normals regeneration to avoid inconsistencies between editor and runtime
 		LODInfo.BuildSettings.bRecomputeTangents = !SkeletalMeshContext->LODs[LODIndex].bHasTangents;
+		LODInfo.BuildSettings.bUseFullPrecisionUVs = SkeletalMeshContext->SkeletalMeshConfig.bUseHighPrecisionUVs;
 		LODInfo.LODHysteresis = 0.02f;
 
 		if (SkeletalMeshContext->SkeletalMeshConfig.LODScreenSize.Contains(LODIndex))
@@ -950,28 +985,18 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 
 #if !WITH_EDITOR
-		int32 BaseIndex = 0;
 		TMap<FString, UMorphTarget*> MorphTargetNamesHistory;
 		TMap<FString, int32> MorphTargetNamesDuplicateCounter;
 
-		for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex].Primitives.Num(); PrimitiveIndex++)
+		int32 BaseIndex = 0;
+
+		for (int32 PrimitiveIndex = 0; PrimitiveIndex < SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives.Num(); PrimitiveIndex++)
 		{
-#if 1 // WITH_DIRECTIVE
-            LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadMorphTarget);
-            const auto& WhitelistedMorphTargetNames = SkeletalMeshContext->SkeletalMeshConfig.WhitelistedMorphTargetNames;
-#endif
-            
-			FglTFRuntimePrimitive& Primitive = SkeletalMeshContext->LODs[LODIndex].Primitives[PrimitiveIndex];
+
+			FglTFRuntimePrimitive& Primitive = SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[PrimitiveIndex];
 
 			for (FglTFRuntimeMorphTarget& MorphTargetData : Primitive.MorphTargets)
 			{
-#if 1 // WITH_DIRECTIVE
-                if (WhitelistedMorphTargetNames.Num() && !WhitelistedMorphTargetNames.Contains(MorphTargetData.Name))
-                {
-                    continue;
-                }
-#endif
-                
 				bool bSkip = true;
 				FMorphTargetLODModel MorphTargetLODModel;
 				MorphTargetLODModel.NumBaseMeshVerts = Primitive.Indices.Num();
@@ -1010,6 +1035,9 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 					Delta.TangentZDelta = FVector::ZeroVector;
 #endif
 					MorphTargetLODModel.Vertices.Add(Delta);
+#if ENGINE_MAJOR_VERSION > 4
+					MorphTargetLODModel.NumVertices = MorphTargetLODModel.Vertices.Num();
+#endif
 				}
 
 				if (SkeletalMeshContext->SkeletalMeshConfig.bIgnoreEmptyMorphTargets && bSkip)
@@ -1038,6 +1066,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 						CurrentMorphTarget->GetMorphLODModels()[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
 						CurrentMorphTarget->GetMorphLODModels()[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
 						CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Append(MorphTargetLODModel.Vertices);
+						CurrentMorphTarget->GetMorphLODModels()[0].NumVertices = CurrentMorphTarget->GetMorphLODModels()[0].Vertices.Num();
 #else
 						CurrentMorphTarget->MorphLODModels[0].NumBaseMeshVerts += MorphTargetLODModel.NumBaseMeshVerts;
 						CurrentMorphTarget->MorphLODModels[0].SectionIndices.Append(MorphTargetLODModel.SectionIndices);
@@ -1089,7 +1118,7 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 
 #endif
 
-		for (int32 MatIndex = 0; MatIndex < SkeletalMeshContext->LODs[LODIndex].Primitives.Num(); MatIndex++)
+		for (int32 MatIndex = 0; MatIndex < SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives.Num(); MatIndex++)
 		{
 			LODInfo.LODMaterialMap.Add(MatIndex);
 
@@ -1098,46 +1127,26 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 			TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->Materials;
 #endif
-			int32 NewMatIndex = SkeletalMaterials.Add(SkeletalMeshContext->LODs[LODIndex].Primitives[MatIndex].Material);
+			int32 NewMatIndex = SkeletalMaterials.Add(SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[MatIndex].Material);
 			SkeletalMaterials[NewMatIndex].UVChannelData.bInitialized = true;
-			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].Primitives[MatIndex].MaterialName)));
+			SkeletalMaterials[NewMatIndex].MaterialSlotName = FName(FString::Printf(TEXT("LOD_%d_Section_%d_%s"), LODIndex, MatIndex, *(SkeletalMeshContext->LODs[LODIndex].RuntimeLOD->Primitives[MatIndex].MaterialName)));
 		}
-        
-        {
-#if 1 // WITH_DIRECTIVE
-            TRACE_CPUPROFILER_EVENT_SCOPE(BuildSkeletalMesh);
-#endif
-            
 #if WITH_EDITOR
-            IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
+		IMeshBuilderModule& MeshBuilderModule = IMeshBuilderModule::GetForRunningPlatform();
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION >= 27
-            FSkeletalMeshBuildParameters SkeletalMeshBuildParameters(SkeletalMeshContext->SkeletalMesh, GetTargetPlatformManagerRef().GetRunningTargetPlatform(), LODIndex, false);
-            if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshBuildParameters))
+		FSkeletalMeshBuildParameters SkeletalMeshBuildParameters(SkeletalMeshContext->SkeletalMesh, GetTargetPlatformManagerRef().GetRunningTargetPlatform(), LODIndex, false);
+		if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshBuildParameters))
 #else
-            if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshContext->SkeletalMesh, LODIndex, false))
+		if (!MeshBuilderModule.BuildSkeletalMesh(SkeletalMeshContext->SkeletalMesh, LODIndex, false))
 #endif
-            {
-                return nullptr;
-            }
+		{
+			return nullptr;
+		}
 #endif
-        }
 	}
 
 #if WITH_EDITOR
-    {
-#if 1 // WITH_DIRECTIVE
-        TRACE_CPUPROFILER_EVENT_SCOPE(BuildSkeletalMesh);
-#endif
-        SkeletalMeshContext->SkeletalMesh->Build();
-    }
-#else
-	if (bHasMorphTargets)
-	{
-#if 1 // WITH_DIRECTIVE
-        LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::InitMorphTarget);
-#endif
-		SkeletalMeshContext->SkeletalMesh->InitMorphTargets();
-	}
+	SkeletalMeshContext->SkeletalMesh->Build();
 #endif
 
 	SkeletalMeshContext->SkeletalMesh->CalculateInvRefMatrices();
@@ -1241,11 +1250,46 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 		}
 	}
 
-	if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies.Num() > 0)
+#if !WITH_EDITOR
+	if (bHasMorphTargets)
+	{
+		SkeletalMeshContext->SkeletalMesh->InitMorphTargets();
+	}
+#endif
+
+	if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies.Num() > 0 || SkeletalMeshContext->SkeletalMeshConfig.PhysicsAssetTemplate)
 	{
 		UPhysicsAsset* PhysicsAsset = NewObject<UPhysicsAsset>(SkeletalMeshContext->SkeletalMesh, NAME_None, RF_Public);
 		if (PhysicsAsset)
 		{
+			if (SkeletalMeshContext->SkeletalMeshConfig.PhysicsAssetTemplate)
+			{
+				UPhysicsAsset* PhysicsAssetTemplate = SkeletalMeshContext->SkeletalMeshConfig.PhysicsAssetTemplate;
+				for (USkeletalBodySetup* SourceBodySetup : PhysicsAssetTemplate->SkeletalBodySetups)
+				{
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+					if (SkeletalMeshContext->SkeletalMesh->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(SourceBodySetup->BoneName) != INDEX_NONE)
+#else
+					if (SkeletalMeshContext->SkeletalMesh->Skeleton->GetReferenceSkeleton().FindBoneIndex(SourceBodySetup->BoneName) != INDEX_NONE)
+#endif
+					{
+						USkeletalBodySetup* NewBodySetup = NewObject<USkeletalBodySetup>(PhysicsAsset, NAME_None, RF_Public);
+						NewBodySetup->CollisionTraceFlag = SourceBodySetup->CollisionTraceFlag;
+						NewBodySetup->PhysicsType = SourceBodySetup->PhysicsType;
+						NewBodySetup->BoneName = SourceBodySetup->BoneName;
+						NewBodySetup->bConsiderForBounds = SourceBodySetup->bConsiderForBounds;
+						NewBodySetup->AggGeom = SourceBodySetup->AggGeom;
+						PhysicsAsset->SkeletalBodySetups.Add(NewBodySetup);
+					}
+				}
+				for (UPhysicsConstraintTemplate* ConstraintTemplate : PhysicsAssetTemplate->ConstraintSetup)
+				{
+					UPhysicsConstraintTemplate* NewConstraint = NewObject<UPhysicsConstraintTemplate>(PhysicsAsset, NAME_None, RF_Public);
+					NewConstraint->DefaultInstance = ConstraintTemplate->DefaultInstance;
+					NewConstraint->ProfileHandles = ConstraintTemplate->ProfileHandles;
+					PhysicsAsset->ConstraintSetup.Add(NewConstraint);
+				}
+			}
 			for (const TPair<FString, FglTFRuntimePhysicsBody>& PhysicsBody : SkeletalMeshContext->SkeletalMeshConfig.PhysicsBodies)
 			{
 				if (PhysicsBody.Key.IsEmpty())
@@ -1314,41 +1358,11 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 	}
 #endif
 
-#if 1 // WITH_DIRECTIVE
-    if (SkeletalMeshContext->SkeletalMeshConfig.bBuildSimpleCollision)
-    {
-        auto SkeletalMesh = SkeletalMeshContext->SkeletalMesh;
-        auto ConstSkeletalMesh = (const USkeletalMesh*)SkeletalMesh;
-        if (!ConstSkeletalMesh->GetBodySetup())
-        {
-            SkeletalMesh->CreateBodySetup();
-        }
-
-        auto BodySetup = ConstSkeletalMesh->GetBodySetup();
-
-        BodySetup->bMeshCollideAll = false;
-        BodySetup->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseSimpleAsComplex;
-        BodySetup->InvalidatePhysicsData();
-
-        FKBoxElem BoxElem;
-        BoxElem.Center = SkeletalMeshContext->BoundingBox.GetCenter();
-        BoxElem.X = SkeletalMeshContext->BoundingBox.GetExtent().X * 2.0f;
-        BoxElem.Y = SkeletalMeshContext->BoundingBox.GetExtent().Y * 2.0f;
-        BoxElem.Z = SkeletalMeshContext->BoundingBox.GetExtent().Z * 2.0f;
-        BodySetup->AggGeom.BoxElems.Add(BoxElem);
-        BodySetup->CreatePhysicsMeshes();
-    }
-#endif
-    
 	return SkeletalMeshContext->SkeletalMesh;
 }
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
-#if 1 // WITH_DIRECTIVE
-    TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadSkeletalMesh);
-    LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadSkeletalMesh);
-#endif
 
 	// first check cache
 	if (CanReadFromCache(SkeletalMeshConfig.CacheMode) && SkeletalMeshesCache.Contains(MeshIndex))
@@ -1363,20 +1377,15 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMesh(const int32 MeshIndex, const
 		return nullptr;
 	}
 
-	TArray<FglTFRuntimePrimitive> Primitives;
-	if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, SkeletalMeshConfig.MaterialsConfig))
+	FglTFRuntimeMeshLOD* LOD = nullptr;
+	if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, SkeletalMeshConfig.MaterialsConfig))
 	{
 		return nullptr;
 	}
 
-	TArray<FglTFRuntimeLOD> LODs;
-	FglTFRuntimeLOD LOD0;
-	LOD0.Primitives = Primitives;
-	LODs.Add(LOD0);
-
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = SkinIndex;
-	SkeletalMeshContext->LODs = LODs;
+	SkeletalMeshContext->LODs.Add(LOD);
 
 	if (!CreateSkeletalMeshFromLODs(SkeletalMeshContext))
 	{
@@ -1415,26 +1424,22 @@ void FglTFRuntimeParser::LoadSkeletalMeshAsync(const int32 MeshIndex, const int3
 				return;
 			}
 
-			TArray<FglTFRuntimePrimitive> Primitives;
-			if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig))
+			FglTFRuntimeMeshLOD* LOD = nullptr;
+			if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig))
 			{
 				return;
 			}
 
-			TArray<FglTFRuntimeLOD> LODs;
-			FglTFRuntimeLOD LOD0;
-			LOD0.Primitives = Primitives;
-			LODs.Add(LOD0);
-
-			SkeletalMeshContext->LODs = LODs;
+			SkeletalMeshContext->LODs.Add(LOD);
 
 			SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
 		});
 }
 
-USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32>&MeshIndices, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
-	TArray<FglTFRuntimeLOD> LODs;
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
+	SkeletalMeshContext->SkinIndex = SkinIndex;
 
 	for (const int32 MeshIndex : MeshIndices)
 	{
@@ -1445,20 +1450,14 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 			return nullptr;
 		}
 
-		TArray<FglTFRuntimePrimitive> Primitives;
-		if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, SkeletalMeshConfig.MaterialsConfig))
+		FglTFRuntimeMeshLOD* LOD = nullptr;
+		if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, SkeletalMeshConfig.MaterialsConfig))
 		{
 			return nullptr;
 		}
 
-		FglTFRuntimeLOD LOD;
-		LOD.Primitives = Primitives;
-		LODs.Add(LOD);
+		SkeletalMeshContext->LODs.Add(LOD);
 	}
-
-	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
-	SkeletalMeshContext->SkinIndex = SkinIndex;
-	SkeletalMeshContext->LODs = LODs;
 
 	if (CreateSkeletalMeshFromLODs(SkeletalMeshContext))
 	{
@@ -1470,131 +1469,17 @@ USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshLODs(const TArray<int32> Mesh
 
 USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshRecursive(const FString & NodeName, const int32 SkinIndex, const TArray<FString>&ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
 {
-	FglTFRuntimeNode Node;
-	TArray<FglTFRuntimeNode> Nodes;
 
-	if (NodeName.IsEmpty())
-	{
-		FglTFRuntimeScene Scene;
-		if (!LoadScene(0, Scene))
-		{
-			AddError("LoadSkeletalMeshRecursive()", "No Scene found in asset");
-			return nullptr;
-		}
-
-		for (int32 NodeIndex : Scene.RootNodesIndices)
-		{
-			if (!LoadNodesRecursive(NodeIndex, Nodes))
-			{
-				AddError("LoadSkeletalMeshRecursive()", "Unable to build Node Tree from first Scene");
-				return nullptr;
-			}
-		}
-	}
-	else
-	{
-		if (!LoadNodeByName(NodeName, Node))
-		{
-			AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
-			return nullptr;
-		}
-
-		if (!LoadNodesRecursive(Node.Index, Nodes))
-		{
-			AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
-			return nullptr;
-		}
-	}
-
+	FglTFRuntimeMeshLOD CombinedLOD;
 	int32 NewSkinIndex = SkinIndex;
-
-	if (NewSkinIndex <= INDEX_NONE)
+	if (!LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, NewSkinIndex, ExcludeNodes, CombinedLOD, SkeletalMeshConfig.MaterialsConfig, SkeletalMeshConfig.SkeletonConfig))
 	{
-		// first search for skinning
-		for (FglTFRuntimeNode& ChildNode : Nodes)
-		{
-			if (ExcludeNodes.Contains(ChildNode.Name))
-			{
-				continue;
-			}
-			if (ChildNode.SkinIndex > INDEX_NONE)
-			{
-				NewSkinIndex = ChildNode.SkinIndex;
-				break;
-			}
-		}
-
-		if (NewSkinIndex <= INDEX_NONE)
-		{
-			AddError("LoadSkeletalMeshRecursive()", "Unable to find a valid Skin");
-			return nullptr;
-		}
+		return nullptr;
 	}
-
-	TArray<FglTFRuntimePrimitive> Primitives;
-
-	// now search for all meshes (will be all merged in the same primitives list)
-	for (FglTFRuntimeNode& ChildNode : Nodes)
-	{
-		if (ExcludeNodes.Contains(ChildNode.Name))
-		{
-			continue;
-		}
-		if (ChildNode.MeshIndex != INDEX_NONE)
-		{
-			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
-			if (!JsonMeshObject)
-			{
-				AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to find Mesh with index %d"), ChildNode.MeshIndex));
-				return nullptr;
-			}
-
-			// keep track of primitives
-			int32 PrimitiveFirstIndex = Primitives.Num();
-
-			if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, SkeletalMeshConfig.MaterialsConfig))
-			{
-				return nullptr;
-			}
-
-			// if the SkinIndex is different from the selected one,
-			// build an override bone map
-			if (ChildNode.SkinIndex > INDEX_NONE && ChildNode.SkinIndex != NewSkinIndex)
-			{
-				TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
-				if (!JsonSkinObject)
-				{
-					AddError("LoadSkeletalMeshRecursive()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
-					return nullptr;
-				}
-
-				TMap<int32, FName> BoneMap;
-
-				FReferenceSkeleton FakeRefSkeleton;
-				if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), FakeRefSkeleton, BoneMap, SkeletalMeshConfig.SkeletonConfig))
-				{
-					AddError("LoadSkeletalMeshRecursive()", "Unable to fill RefSkeleton.");
-					return nullptr;
-				}
-
-				// apply overrides
-				for (int32 PrimitiveIndex = PrimitiveFirstIndex; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
-				{
-					FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
-					Primitive.OverrideBoneMap = BoneMap;
-				}
-			}
-		}
-	}
-
-	TArray<FglTFRuntimeLOD> LODs;
-	FglTFRuntimeLOD LOD0;
-	LOD0.Primitives = Primitives;
-	LODs.Add(LOD0);
 
 	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
 	SkeletalMeshContext->SkinIndex = NewSkinIndex;
-	SkeletalMeshContext->LODs = LODs;
+	SkeletalMeshContext->LODs.Add(&CombinedLOD);
 
 	if (CreateSkeletalMeshFromLODs(SkeletalMeshContext))
 	{
@@ -1611,131 +1496,16 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 	Async(EAsyncExecution::Thread, [this, SkeletalMeshContext, ExcludeNodes, NodeName, SkinIndex, AsyncCallback]()
 		{
 			FglTFRuntimeSkeletalMeshContextFinalizer AsyncFinalizer(SkeletalMeshContext, AsyncCallback);
-
-			FglTFRuntimeNode Node;
-			TArray<FglTFRuntimeNode> Nodes;
-
-			if (NodeName.IsEmpty())
-			{
-				FglTFRuntimeScene Scene;
-				if (!LoadScene(0, Scene))
-				{
-					AddError("LoadSkeletalMeshRecursiveAsync()", "No Scene found in asset");
-					return;
-				}
-
-				for (int32 NodeIndex : Scene.RootNodesIndices)
-				{
-					if (!LoadNodesRecursive(NodeIndex, Nodes))
-					{
-						AddError("LoadSkeletalMeshRecursiveAsync()", "Unable to build Node Tree from first Scene");
-						return;
-					}
-				}
-			}
-			else
-			{
-				if (!LoadNodeByName(NodeName, Node))
-				{
-					AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
-					return;
-				}
-
-				if (!LoadNodesRecursive(Node.Index, Nodes))
-				{
-					AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
-					return;
-				}
-			}
-
+			// ensure to cache it as the finalizer requires LOD access
+			FglTFRuntimeMeshLOD& CombinedLOD = SkeletalMeshContext->CachedRuntimeMeshLODs.AddDefaulted_GetRef();
 			int32 NewSkinIndex = SkinIndex;
-
-			if (NewSkinIndex <= INDEX_NONE)
+			if (!LoadSkinnedMeshRecursiveAsRuntimeLOD(NodeName, NewSkinIndex, ExcludeNodes, CombinedLOD, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig))
 			{
-				// first search for skinning
-				for (FglTFRuntimeNode& ChildNode : Nodes)
-				{
-					if (ExcludeNodes.Contains(ChildNode.Name))
-					{
-						continue;
-					}
-					if (ChildNode.SkinIndex > INDEX_NONE)
-					{
-						NewSkinIndex = ChildNode.SkinIndex;
-						break;
-					}
-				}
-
-				if (NewSkinIndex <= INDEX_NONE)
-				{
-					AddError("LoadSkeletalMeshRecursiveAsync()", "Unable to find a valid Skin");
-					return;
-				}
+				return;
 			}
-
-			TArray<FglTFRuntimePrimitive> Primitives;
-
-			// now search for all meshes (will be all merged in the same primitives list)
-			for (FglTFRuntimeNode& ChildNode : Nodes)
-			{
-				if (ExcludeNodes.Contains(ChildNode.Name))
-				{
-					continue;
-				}
-				if (ChildNode.MeshIndex != INDEX_NONE)
-				{
-					TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
-					if (!JsonMeshObject)
-					{
-						AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to find Mesh with index %d"), ChildNode.MeshIndex));
-						return;
-					}
-
-					// keep track of primitives
-					int32 PrimitiveFirstIndex = Primitives.Num();
-
-					if (!LoadPrimitives(JsonMeshObject.ToSharedRef(), Primitives, SkeletalMeshContext->SkeletalMeshConfig.MaterialsConfig))
-					{
-						return;
-					}
-
-					// if the SkinIndex is different from the selected one,
-					// build an override bone map
-					if (ChildNode.SkinIndex > INDEX_NONE && ChildNode.SkinIndex != NewSkinIndex)
-					{
-						TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
-						if (!JsonSkinObject)
-						{
-							AddError("LoadSkeletalMeshRecursiveAsync()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
-							return;
-						}
-
-						TMap<int32, FName> BoneMap;
-
-						FReferenceSkeleton FakeRefSkeleton;
-						if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), FakeRefSkeleton, BoneMap, SkeletalMeshContext->SkeletalMeshConfig.SkeletonConfig))
-						{
-							AddError("LoadSkeletalMeshRecursiveAsync()", "Unable to fill RefSkeleton.");
-							return;
-						}
-
-						// apply overrides
-						for (int32 PrimitiveIndex = PrimitiveFirstIndex; PrimitiveIndex < Primitives.Num(); PrimitiveIndex++)
-						{
-							FglTFRuntimePrimitive& Primitive = Primitives[PrimitiveIndex];
-							Primitive.OverrideBoneMap = BoneMap;
-						}
-					}
-				}
-			}
-
-			TArray<FglTFRuntimeLOD> LODs;
-			FglTFRuntimeLOD LOD0;
-			LOD0.Primitives = Primitives;
-			LODs.Add(LOD0);
 
 			SkeletalMeshContext->SkinIndex = NewSkinIndex;
-			SkeletalMeshContext->LODs = LODs;
+			SkeletalMeshContext->LODs.Add(&CombinedLOD);
 
 			SkeletalMeshContext->SkeletalMesh = CreateSkeletalMeshFromLODs(SkeletalMeshContext);
 		});
@@ -1743,10 +1513,6 @@ void FglTFRuntimeParser::LoadSkeletalMeshRecursiveAsync(const FString & NodeName
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * SkeletalMesh, const FString AnimationName, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
-#if 1 // WITH_DIRECTIVE
-    LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
-#endif
-    
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1782,10 +1548,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh * S
 
 UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
-#if 1 // WITH_DIRECTIVE
-    LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
-#endif
-    
+
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1797,41 +1560,39 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 		return nullptr;
 	}
 
-	if (Node.SkinIndex <= INDEX_NONE)
-	{
-		AddError("LoadNodeSkeletalAnimation()", FString::Printf(TEXT("No skin defined for node %d"), NodeIndex));
-		return nullptr;
-	}
-
-	TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", Node.SkinIndex);
-	if (!JsonSkinObject)
-	{
-		AddError("LoadNodeSkeletalAnimation()", "No skins defined in the asset");
-		return nullptr;
-	}
-
-	const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
-	if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
-	{
-		AddError("LoadNodeSkeletalAnimation()", "No joints defined in the skin");
-		return nullptr;
-	}
-
 	TArray<int32> Joints;
-	for (TSharedPtr<FJsonValue> JsonJoint : (*JsonJoints))
+
+	// this could be a static mesh read as a skeletal one...
+	if (Node.SkinIndex > INDEX_NONE)
 	{
-		int64 JointIndex;
-		if (!JsonJoint->TryGetNumber(JointIndex))
+		TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", Node.SkinIndex);
+		if (!JsonSkinObject)
 		{
+			AddError("LoadNodeSkeletalAnimation()", "No skins defined in the asset");
 			return nullptr;
 		}
-		Joints.Add(JointIndex);
+
+		const TArray<TSharedPtr<FJsonValue>>* JsonJoints;
+		if (!JsonSkinObject->TryGetArrayField("joints", JsonJoints))
+		{
+			AddError("LoadNodeSkeletalAnimation()", "No joints defined in the skin");
+			return nullptr;
+		}
+
+		for (TSharedPtr<FJsonValue> JsonJoint : (*JsonJoints))
+		{
+			int64 JointIndex;
+			if (!JsonJoint->TryGetNumber(JointIndex))
+			{
+				return nullptr;
+			}
+			Joints.Add(JointIndex);
+		}
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
 	if (!Root->TryGetArrayField("animations", JsonAnimations))
 	{
-		AddError("LoadNodeSkeletalAnimation()", "No animations defined in the asset");
 		return nullptr;
 	}
 
@@ -1839,24 +1600,25 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 	{
 		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
 		if (!JsonAnimationObject)
+		{
 			return nullptr;
+		}
 		float Duration;
 		TMap<FString, FRawAnimSequenceTrack> Tracks;
 		TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
 		bool bAnimationFound = false;
-		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound](const FglTFRuntimeNode& Node) -> bool
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
 			{
 				if (!bAnimationFound)
 				{
-					bAnimationFound = Joints.Contains(Node.Index);
+					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
 				}
 				return true;
 			}))
 		{
 			return nullptr;
 		}
-
-			if (bAnimationFound)
+			if (bAnimationFound || MorphTargetCurves.Num() > 0)
 			{
 				// this is very inefficient as we parse the tracks twice
 				// TODO: refactor it
@@ -1870,10 +1632,6 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh * Ske
 
 UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
 {
-#if 1 // WITH_DIRECTIVE
-    LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
-#endif
-    
 	if (!SkeletalMesh)
 	{
 		return nullptr;
@@ -1888,13 +1646,14 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 	float Duration;
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
+
 	TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
 	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
 	{
 		return nullptr;
 	}
 
-	int32 NumFrames = Duration * 30;
+	int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
 	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
 	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
@@ -1910,13 +1669,14 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	FloatProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), Duration);
 	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
 	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
-	FFrameRate FrameRate(NumFrames, Duration);
+
+	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
 	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
 	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
 	*FrameRatePtr = FrameRate;
 #else
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	AnimSequence->SequenceLength = Duration;
+		AnimSequence->SequenceLength = Duration;
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif
 #else
@@ -1924,6 +1684,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	AnimSequence->SequenceLength = Duration;
 #endif
 	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
+	AnimSequence->RootMotionRootLock = SkeletalAnimationConfig.RootMotionRootLock;
 
 	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
 
@@ -1947,7 +1708,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #endif
 
 		}
-}
+	}
 #endif
 
 	bool bHasTracks = false;
@@ -2102,6 +1863,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 			}
 		}
 
+
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION > 4
 		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
@@ -2130,9 +1892,398 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		}
 
 #if ENGINE_MAJOR_VERSION > 4
-		FRawCurveTracks& RawCurveData = const_cast<FRawCurveTracks&>(AnimSequence->GetCurveData());
-		RawCurveData.AddCurveData(SmartName);
-		FFloatCurve* NewCurve = (FFloatCurve*)RawCurveData.GetCurveData(SmartName.UID, ERawCurveTrackTypes::RCT_Float);
+#if WITH_EDITOR
+		FAnimationCurveData& RawCurveData = const_cast<FAnimationCurveData&>(AnimSequence->GetDataModel()->GetCurveData());
+		int32 NewCurveIndex = RawCurveData.FloatCurves.Add(FFloatCurve(SmartName, 0));
+		FFloatCurve* NewCurve = &RawCurveData.FloatCurves[NewCurveIndex];
+#else
+		FRawCurveTracks& CurveTracks = const_cast<FRawCurveTracks&>(AnimSequence->GetCurveData());
+		int32 NewCurveIndex = CurveTracks.FloatCurves.Add(FFloatCurve(SmartName, 0));
+		FFloatCurve* NewCurve = &CurveTracks.FloatCurves[NewCurveIndex];
+#endif
+#else
+		AnimSequence->RawCurveData.AddCurveData(SmartName);
+		FFloatCurve* NewCurve = (FFloatCurve*)AnimSequence->RawCurveData.GetCurveData(SmartName.UID, ERawCurveTrackTypes::RCT_Float);
+#endif
+
+		for (TPair<float, float>& CurvePair : Pair.Value)
+		{
+			FKeyHandle NewKeyHandle = NewCurve->FloatCurve.AddKey(CurvePair.Key, CurvePair.Value, false);
+
+			ERichCurveInterpMode NewInterpMode = RCIM_Linear;
+			ERichCurveTangentMode NewTangentMode = RCTM_Auto;
+			ERichCurveTangentWeightMode NewTangentWeightMode = RCTWM_WeightedNone;
+
+			float LeaveTangent = 0.f;
+			float ArriveTangent = 0.f;
+			float LeaveTangentWeight = 0.f;
+			float ArriveTangentWeight = 0.f;
+
+			NewCurve->FloatCurve.SetKeyInterpMode(NewKeyHandle, NewInterpMode);
+			NewCurve->FloatCurve.SetKeyTangentMode(NewKeyHandle, NewTangentMode);
+			NewCurve->FloatCurve.SetKeyTangentWeightMode(NewKeyHandle, NewTangentWeightMode);
+		}
+
+		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
+
+#if !WITH_EDITOR
+		AnimSequence->CompressedData.CompressedCurveNames.Add(SmartName);
+		const_cast<FCurveMetaData*>(AnimSequence->GetSkeleton()->GetCurveMetaData(SmartName.UID))->Type.bMorphtarget = true;
+#endif
+
+		bHasTracks = true;
+	}
+
+	if (!bHasTracks)
+	{
+		AddError("LoadSkeletalAnimation()", "No Bone or MorphTarget Tracks found in animation");
+		return nullptr;
+	}
+
+#if WITH_EDITOR
+#if ENGINE_MAJOR_VERSION > 4
+	// hack for calling GenerateTransientData()
+	AnimSequence->GetDataModel()->PostDuplicate(false);
+#else
+	AnimSequence->PostProcessSequence();
+#endif
+#else
+	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+#if ENGINE_MAJOR_VERSION > 4
+	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
+#endif
+	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
+	UglTFAnimCurveCompressionCodec* AnimCurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+	AnimCurveCompressionCodec->AnimSequence = AnimSequence;
+	AnimSequence->CompressedData.CurveCompressionCodec = AnimCurveCompressionCodec;
+	AnimSequence->PostLoad();
+#endif
+
+	return AnimSequence;
+}
+
+UAnimSequence* FglTFRuntimeParser::CreateAnimationFromPose(USkeletalMesh * SkeletalMesh, const int32 SkinIndex, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
+{
+	if (!SkeletalMesh)
+	{
+		return nullptr;
+	}
+
+	constexpr int32 NumFrames = 1;
+	const float Duration = NumFrames / SkeletalAnimationConfig.FramesPerSecond;
+
+	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
+#else
+	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
+#endif
+	AnimSequence->SetPreviewMesh(SkeletalMesh);
+#if ENGINE_MAJOR_VERSION > 4
+#if WITH_EDITOR
+	FIntProperty* IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfFrames")));
+	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
+	FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("PlayLength")));
+	FloatProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), Duration);
+	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
+	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
+
+	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
+	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
+	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
+	*FrameRatePtr = FrameRate;
+#else
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->SequenceLength = Duration;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#endif
+#else
+	AnimSequence->SetRawNumberOfFrame(NumFrames);
+	AnimSequence->SequenceLength = Duration;
+#endif
+	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
+	AnimSequence->RootMotionRootLock = SkeletalAnimationConfig.RootMotionRootLock;
+
+	const TArray<FTransform> BonesPoses = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBonePose();
+	const TArray<FMeshBoneInfo>& MeshBoneInfos = AnimSequence->GetSkeleton()->GetReferenceSkeleton().GetRefBoneInfo();
+
+#if !WITH_EDITOR
+	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
+	CompressionCodec->Tracks.AddDefaulted(BonesPoses.Num());
+	AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable.AddDefaulted(BonesPoses.Num());
+	for (int32 BoneIndex = 0; BoneIndex < BonesPoses.Num(); BoneIndex++)
+	{
+		AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable[BoneIndex] = BoneIndex;
+		for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
+		{
+#if ENGINE_MAJOR_VERSION > 4
+			CompressionCodec->Tracks[BoneIndex].PosKeys.Add(FVector3f(BonesPoses[BoneIndex].GetLocation()));
+			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(FQuat4f(BonesPoses[BoneIndex].GetRotation()));
+			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(FVector3f(BonesPoses[BoneIndex].GetScale3D()));
+#else
+			CompressionCodec->Tracks[BoneIndex].PosKeys.Add(BonesPoses[BoneIndex].GetLocation());
+			CompressionCodec->Tracks[BoneIndex].RotKeys.Add(BonesPoses[BoneIndex].GetRotation());
+			CompressionCodec->Tracks[BoneIndex].ScaleKeys.Add(BonesPoses[BoneIndex].GetScale3D());
+#endif
+
+		}
+	}
+#endif
+
+	int64 RootBoneIndex = INDEX_NONE;
+	TArray<int32> Joints;
+	if (SkinIndex > INDEX_NONE)
+	{
+		TSharedPtr<FJsonObject> SkinObject = GetJsonObjectFromRootIndex("skins", SkinIndex);
+		if (!SkinObject)
+		{
+			return nullptr;
+		}
+		if (!GetRootBoneIndex(SkinObject.ToSharedRef(), RootBoneIndex, Joints, FglTFRuntimeSkeletonConfig()))
+		{
+			return nullptr;
+		}
+	}
+
+	TMap<FString, FRawAnimSequenceTrack> Tracks;
+	for (int32 BoneIndex = 0; BoneIndex < BonesPoses.Num(); BoneIndex++)
+	{
+		FglTFRuntimeNode Node;
+		const FString TrackName = MeshBoneInfos[BoneIndex].Name.ToString();
+
+		if (RootBoneIndex > INDEX_NONE)
+		{
+			if (!LoadJointByName(RootBoneIndex, TrackName, Node))
+			{
+				continue;
+			}
+		}
+		else
+		{
+			if (!LoadNodeByName(TrackName, Node))
+			{
+				continue;
+			}
+		}
+
+		FTransform Transform = Node.Transform;
+
+		if (BoneIndex == 0)
+		{
+			FglTFRuntimeNode ParentNode = Node;
+			while (ParentNode.ParentIndex != INDEX_NONE)
+			{
+				if (!LoadNode(ParentNode.ParentIndex, ParentNode))
+				{
+					break; // overengineering... (useless)
+				}
+				Transform *= ParentNode.Transform;
+			}
+		}
+
+		FRawAnimSequenceTrack Track;
+#if ENGINE_MAJOR_VERSION > 4
+		Track.PosKeys.Add(FVector3f(Transform.GetLocation()));
+#else
+		Track.PosKeys.Add(Transform.GetLocation());
+#endif
+
+
+#if ENGINE_MAJOR_VERSION > 4
+		Track.RotKeys.Add(FQuat4f(Transform.GetRotation()));
+#else
+		Track.RotKeys.Add(Transform.GetRotation());
+#endif
+
+
+#if ENGINE_MAJOR_VERSION > 4
+		Track.ScaleKeys.Add(FVector3f(Transform.GetScale3D()));
+#else
+		Track.ScaleKeys.Add(Transform.GetScale3D());
+#endif
+
+		Tracks.Add(TrackName, Track);
+	}
+
+	OnCreatedPoseTracks.Broadcast(AsShared(), Tracks);
+
+	for (const TPair<FString, FRawAnimSequenceTrack>& Pair : Tracks)
+	{
+		const int32 BoneIndex = AnimSequence->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(*Pair.Key);
+#if WITH_EDITOR
+#if ENGINE_MAJOR_VERSION > 4
+		TArray<FBoneAnimationTrack>& BoneTracks = const_cast<TArray<FBoneAnimationTrack>&>(AnimSequence->GetDataModel()->GetBoneAnimationTracks());
+		FBoneAnimationTrack BoneTrack;
+		BoneTrack.Name = *Pair.Key;
+		BoneTrack.BoneTreeIndex = BoneIndex;
+		BoneTrack.InternalTrackData = Pair.Value;
+		BoneTracks.Add(BoneTrack);
+#else
+		AnimSequence->AddNewRawTrack(*Pair.Key, const_cast<FRawAnimSequenceTrack*>(&Pair.Value));
+#endif
+#else
+		CompressionCodec->Tracks[BoneIndex] = Pair.Value;
+#endif
+	}
+
+#if WITH_EDITOR
+#if ENGINE_MAJOR_VERSION > 4
+	// hack for calling GenerateTransientData()
+	AnimSequence->GetDataModel()->PostDuplicate(false);
+#else
+	AnimSequence->PostProcessSequence();
+#endif
+#else
+	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
+#if ENGINE_MAJOR_VERSION > 4
+	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
+#endif
+	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
+	AnimSequence->CompressedData.CurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+	AnimSequence->PostLoad();
+#endif
+
+	return AnimSequence;
+}
+
+UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh * SkeletalMesh, const TArray<FglTFRuntimePathItem>&BonesPath, const TArray<FglTFRuntimePathItem>&MorphTargetsPath, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig)
+{
+	if (!SkeletalMesh)
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FJsonValue> JsonObject = GetJSONObjectFromPath(MorphTargetsPath);
+	if (!JsonObject)
+	{
+		return nullptr;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!JsonObject->TryGetArray(JsonArray))
+	{
+		AddError("CreateSkeletalAnimationFromPath()", "Expected a JSON array.");
+		return nullptr;
+	}
+
+	const int32 NumFrames = JsonArray->Num();
+	const float Duration = NumFrames / SkeletalAnimationConfig.FramesPerSecond;
+
+	TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
+
+	// build the curves list
+	for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
+	{
+		TSharedPtr<FJsonValue> JsonFrame = (*JsonArray)[FrameIndex];
+		const TSharedPtr<FJsonObject>* JsonFrameObject = nullptr;
+		if (JsonFrame->TryGetObject(JsonFrameObject))
+		{
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*JsonFrameObject)->Values)
+			{
+				if (!MorphTargetCurves.Contains(*Pair.Key))
+				{
+					MorphTargetCurves.Add(*Pair.Key);
+				}
+			}
+		}
+		else
+		{
+			AddError("CreateSkeletalAnimationFromPath()", "Expected a JSON object for each frame.");
+			return nullptr;
+		}
+	}
+
+	TArray<FName> MorphTargetKeys;
+	MorphTargetCurves.GetKeys(MorphTargetKeys);
+
+	TMap<FName, float> CurrentFrameValues;
+
+	for (const FName& Name : MorphTargetKeys)
+	{
+		CurrentFrameValues.Add(Name, 0);
+	}
+
+	const float FrameDuration = 1.0f / SkeletalAnimationConfig.FramesPerSecond;
+	//fill curves
+	for (int32 FrameIndex = 0; FrameIndex < NumFrames; FrameIndex++)
+	{
+		TSharedPtr<FJsonValue> JsonFrame = (*JsonArray)[FrameIndex];
+		TSharedPtr<FJsonObject> JsonFrameObject = JsonFrame->AsObject(); // no need to check for errors
+
+		const float Time = FrameDuration * FrameIndex;
+
+		for (const FName& KeyName : MorphTargetKeys)
+		{
+			if (JsonFrameObject->Values.Contains(KeyName.ToString()))
+			{
+				double Value = 0;
+				if (!JsonFrameObject->Values[KeyName.ToString()]->TryGetNumber(Value))
+				{
+					Value = 0;
+				}
+				MorphTargetCurves[KeyName].Add(TPair<float, float>{Time, Value});
+				CurrentFrameValues[KeyName] = Value;
+			}
+			else
+			{
+				MorphTargetCurves[KeyName].Add(TPair<float, float>{Time, CurrentFrameValues[KeyName]});
+			}
+		}
+	}
+
+
+	UAnimSequence* AnimSequence = NewObject<UAnimSequence>(GetTransientPackage(), NAME_None, RF_Public);
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+	AnimSequence->SetSkeleton(SkeletalMesh->GetSkeleton());
+#else
+	AnimSequence->SetSkeleton(SkeletalMesh->Skeleton);
+#endif
+	AnimSequence->SetPreviewMesh(SkeletalMesh);
+#if ENGINE_MAJOR_VERSION > 4
+#if WITH_EDITOR
+	FIntProperty* IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfFrames")));
+	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
+	FFloatProperty* FloatProperty = CastField<FFloatProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("PlayLength")));
+	FloatProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), Duration);
+	IntProperty = CastField<FIntProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("NumberOfKeys")));
+	IntProperty->SetPropertyValue_InContainer(AnimSequence->GetDataModel(), NumFrames);
+
+	FFrameRate FrameRate(SkeletalAnimationConfig.FramesPerSecond, 1);
+	FStructProperty* StructProperty = CastField<FStructProperty>(UAnimDataModel::StaticClass()->FindPropertyByName(TEXT("FrameRate")));
+	FFrameRate* FrameRatePtr = StructProperty->ContainerPtrToValuePtr<FFrameRate>(AnimSequence->GetDataModel());
+	*FrameRatePtr = FrameRate;
+#else
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		AnimSequence->SequenceLength = Duration;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+#endif
+#else
+	AnimSequence->SetRawNumberOfFrame(NumFrames);
+	AnimSequence->SequenceLength = Duration;
+#endif
+	AnimSequence->bEnableRootMotion = SkeletalAnimationConfig.bRootMotion;
+	AnimSequence->RootMotionRootLock = SkeletalAnimationConfig.RootMotionRootLock;
+
+	// add MorphTarget curves
+	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
+	{
+		FSmartName SmartName;
+		if (!AnimSequence->GetSkeleton()->GetSmartNameByName(USkeleton::AnimCurveMappingName, Pair.Key, SmartName))
+		{
+			SmartName.DisplayName = Pair.Key;
+			AnimSequence->GetSkeleton()->VerifySmartName(USkeleton::AnimCurveMappingName, SmartName);
+		}
+
+#if ENGINE_MAJOR_VERSION > 4
+#if WITH_EDITOR
+		FAnimationCurveData& RawCurveData = const_cast<FAnimationCurveData&>(AnimSequence->GetDataModel()->GetCurveData());
+		int32 NewCurveIndex = RawCurveData.FloatCurves.Add(FFloatCurve(SmartName, 0));
+		FFloatCurve* NewCurve = &RawCurveData.FloatCurves[NewCurveIndex];
+#else
+		FRawCurveTracks& CurveTracks = const_cast<FRawCurveTracks&>(AnimSequence->GetCurveData());
+		int32 NewCurveIndex = CurveTracks.FloatCurves.Add(FFloatCurve(SmartName, 0));
+		FFloatCurve* NewCurve = &CurveTracks.FloatCurves[NewCurveIndex];
+#endif
 #else
 		AnimSequence->RawCurveData.AddCurveData(SmartName);
 		FFloatCurve* NewCurve = (FFloatCurve*)AnimSequence->RawCurveData.GetCurveData(SmartName.UID, ERawCurveTrackTypes::RCT_Float);
@@ -2159,13 +2310,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 
 		AnimSequence->GetSkeleton()->AccumulateCurveMetaData(Pair.Key, false, true);
 
-		bHasTracks = true;
-	}
-
-	if (!bHasTracks)
-	{
-		AddError("LoadSkeletalAnimation()", "No Bone or MorphTarget Tracks found in animation");
-		return nullptr;
+#if !WITH_EDITOR
+		AnimSequence->CompressedData.CompressedCurveNames.Add(SmartName);
+		const_cast<FCurveMetaData*>(AnimSequence->GetSkeleton()->GetCurveMetaData(SmartName.UID))->Type.bMorphtarget = true;
+#endif
 	}
 
 #if WITH_EDITOR
@@ -2176,129 +2324,238 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	AnimSequence->PostProcessSequence();
 #endif
 #else
+	UglTFAnimBoneCompressionCodec* CompressionCodec = NewObject<UglTFAnimBoneCompressionCodec>();
 	AnimSequence->CompressedData.CompressedDataStructure = MakeUnique<FUECompressedAnimData>();
 #if ENGINE_MAJOR_VERSION > 4
 	AnimSequence->CompressedData.CompressedDataStructure->CompressedNumberOfKeys = NumFrames;
 #endif
 	AnimSequence->CompressedData.BoneCompressionCodec = CompressionCodec;
-	AnimSequence->CompressedData.CurveCompressionCodec = NewObject<UAnimCurveCompressionCodec_CompressedRichCurve>();
+	UglTFAnimCurveCompressionCodec* AnimCurveCompressionCodec = NewObject<UglTFAnimCurveCompressionCodec>();
+	AnimCurveCompressionCodec->AnimSequence = AnimSequence;
+	AnimSequence->CompressedData.CurveCompressionCodec = AnimCurveCompressionCodec;
 	AnimSequence->PostLoad();
 #endif
 
 	return AnimSequence;
 }
 
+FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const float T1, const FVector4 Value0, const FVector4 OutTangent, const FVector4 Value1, const FVector4 InTangent)
+{
+	float TD = T1 - T0;
+	float T = (TC - T0) / TD;
+	float TT = T * T;
+	float TTT = TT * T;
+
+	float S2 = -2 * TTT + 3 * TT;
+	float S3 = TTT - TT;
+	float S0 = 1 - S2;
+	float S1 = S3 - TT + T;
+
+	FVector4 CubicValue = S0 * Value0;
+	CubicValue += S1 * OutTangent * TD;
+	CubicValue += S2 * Value1;
+	CubicValue += S3 * InTangent * TD;
+
+	return CubicValue;
+}
+
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
-#if 1 // WITH_DIRECTIVE
-    LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::LoadAnimation);
-#endif
-    
-	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const TArray<float> Timeline, const TArray<FVector4> Values)
-	{
-		int32 NumFrames = Duration * 30;
 
-		float FrameDelta = 1.f / 30;
+	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
+	{
+		FString TrackName = Node.Name;
+
+		if (SkeletalAnimationConfig.CurveRemapper.Remapper.IsBound())
+		{
+			TrackName = SkeletalAnimationConfig.CurveRemapper.Remapper.Execute(Node.Index, TrackName, Path, SkeletalAnimationConfig.CurveRemapper.Context);
+		}
+
+		if (SkeletalAnimationConfig.RemoveTracks.Contains(TrackName))
+		{
+			return;
+		}
+
+		int32 NumFrames = FMath::Max<int32>(Duration * SkeletalAnimationConfig.FramesPerSecond, 1);
+
+		float FrameDelta = 1.f / SkeletalAnimationConfig.FramesPerSecond;
 
 		if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
 
-			if (!Tracks.Contains(Node.Name))
+			if (!Tracks.Contains(TrackName))
 			{
-				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+				Tracks.Add(TrackName, FRawAnimSequenceTrack());
 			}
 
-			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
-			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				const float FrameBase = FrameDelta * Frame;
+				FQuat AnimQuat;
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 FirstQuatV = Values[FirstIndex];
-				FVector4 SecondQuatV = Values[SecondIndex];
-				FQuat FirstQuat = { FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W };
-				FQuat SecondQuat = { SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W };
-				FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
-				FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
-				FirstQuat = FirstMatrix.ToQuat();
-				SecondQuat = SecondMatrix.ToQuat();
-				FQuat AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 FirstQuatV = Curve.Values[FirstIndex];
+				FVector4 SecondQuatV = Curve.Values[SecondIndex];
+				FQuat FirstQuat = FQuat(FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W).GetNormalized();
+				FQuat SecondQuat = FQuat(SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W).GetNormalized();
+
+				// cubic spline ?
+				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+				{
+					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], FirstQuatV, Curve.OutTangents[FirstIndex], SecondQuatV, Curve.InTangents[SecondIndex]);
+
+					AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
+
+					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
+
+					AnimQuat = RotationMatrix.ToQuat();
+				}
+				else if (FirstIndex == SecondIndex)
+				{
+					FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+
+					AnimQuat = RotationMatrix.ToQuat();
+				}
+				else
+				{
+
+					FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+					FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
+					FirstQuat = FirstMatrix.ToQuat();
+					SecondQuat = SecondMatrix.ToQuat();
+					AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+				}
+
+				if (SkeletalAnimationConfig.RetargetTo)
+				{
+					const int32 RetargetBoneIndex = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().FindBoneIndex(*TrackName);
+					if (RetargetBoneIndex > INDEX_NONE)
+					{
+						FTransform RetargetBoneTransform = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().GetRefBonePose()[RetargetBoneIndex];
+						AnimQuat = Node.Transform.InverseTransformRotation(AnimQuat);
+						AnimQuat = RetargetBoneTransform.TransformRotation(AnimQuat);
+					}
+				}
+
+				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+				{
+					AnimQuat = SkeletalAnimationConfig.TransformPose[TrackName].TransformRotation(AnimQuat);
+				}
+
+				if (SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound())
+				{
+					AnimQuat = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.Execute(TrackName, Frame, AnimQuat.Rotator(), SkeletalAnimationConfig.FrameRotationRemapper.Context).Quaternion();
+				}
+
 #if ENGINE_MAJOR_VERSION > 4
 				Track.RotKeys.Add(FQuat4f(AnimQuat));
 #else
 				Track.RotKeys.Add(AnimQuat);
 #endif
-				FrameBase += FrameDelta;
 			}
 		}
 		else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
 
-			if (!Tracks.Contains(Node.Name))
+			if (!Tracks.Contains(TrackName))
 			{
-				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+				Tracks.Add(TrackName, FRawAnimSequenceTrack());
 			}
 
-			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
-			float FrameBase = 0.f;
+
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				const float FrameBase = FrameDelta * Frame;
+				FVector AnimLocation;
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Values[FirstIndex];
-				FVector4 Second = Values[SecondIndex];
-				FVector AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Curve.Values[FirstIndex];
+				FVector4 Second = Curve.Values[SecondIndex];
+
+				// cubic spline ?
+				if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+				{
+					FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], First, Curve.OutTangents[FirstIndex], Second, Curve.InTangents[SecondIndex]);
+
+					AnimLocation = SceneBasis.TransformPosition(CubicValue) * SceneScale;
+				}
+				else
+				{
+					AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+				}
+
+				if (SkeletalAnimationConfig.RetargetTo)
+				{
+					const int32 RetargetBoneIndex = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().FindBoneIndex(*TrackName);
+					if (RetargetBoneIndex > INDEX_NONE)
+					{
+						FTransform RetargetBoneTransform = SkeletalAnimationConfig.RetargetTo->GetReferenceSkeleton().GetRefBonePose()[RetargetBoneIndex];
+						AnimLocation = Node.Transform.InverseTransformPosition(AnimLocation);
+						AnimLocation = RetargetBoneTransform.TransformPosition(AnimLocation);
+					}
+				}
+
+				if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
+				{
+					AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
+				}
+
+				if (SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.IsBound())
+				{
+					AnimLocation = SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.Execute(TrackName, Frame, AnimLocation, SkeletalAnimationConfig.FrameRotationRemapper.Context);
+				}
+
 #if ENGINE_MAJOR_VERSION > 4
 				Track.PosKeys.Add(FVector3f(AnimLocation));
 #else
 				Track.PosKeys.Add(AnimLocation);
 #endif
-				FrameBase += FrameDelta;
 			}
 		}
 		else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 		{
-			if (Timeline.Num() != Values.Num())
+			if (Curve.Timeline.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
 				return;
 			}
 
-			if (!Tracks.Contains(Node.Name))
+			if (!Tracks.Contains(TrackName))
 			{
-				Tracks.Add(Node.Name, FRawAnimSequenceTrack());
+				Tracks.Add(TrackName, FRawAnimSequenceTrack());
 			}
 
-			FRawAnimSequenceTrack& Track = Tracks[Node.Name];
+			FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
-			float FrameBase = 0.f;
 			for (int32 Frame = 0; Frame < NumFrames; Frame++)
 			{
+				const float FrameBase = FrameDelta * Frame;
 				int32 FirstIndex;
 				int32 SecondIndex;
-				float Alpha = FindBestFrames(Timeline, FrameBase, FirstIndex, SecondIndex);
-				FVector4 First = Values[FirstIndex];
-				FVector4 Second = Values[SecondIndex];
+				float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+				FVector4 First = Curve.Values[FirstIndex];
+				FVector4 Second = Curve.Values[SecondIndex];
 #if ENGINE_MAJOR_VERSION > 4
 				Track.ScaleKeys.Add(FVector3f((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling()));
 #else
 				Track.ScaleKeys.Add((SceneBasis.Inverse() * FScaleMatrix(FMath::Lerp(First, Second, Alpha)) * SceneBasis).ExtractScaling());
 #endif
-				FrameBase += FrameDelta;
 			}
 		}
 		else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
@@ -2310,9 +2567,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				return;
 			}
 
-			if (Timeline.Num() != Values.Num() / MorphTargetNames.Num())
+			if (Curve.Timeline.Num() * MorphTargetNames.Num() != Curve.Values.Num())
 			{
-				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for weights on node %d"), Timeline.Num(), Values.Num(), Node.Index));
+				AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for weights on node %d"), Curve.Timeline.Num(), Curve.Values.Num() / MorphTargetNames.Num(), Node.Index));
 				return;
 			}
 
@@ -2320,10 +2577,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			{
 				FName MorphTargetName = MorphTargetNames[MorphTargetIndex];
 				TArray<TPair<float, float>> Curves;
-				for (int32 TimelineIndex = 0; TimelineIndex < Timeline.Num(); TimelineIndex++)
+
+				for (int32 TimelineIndex = 0; TimelineIndex < Curve.Timeline.Num(); TimelineIndex++)
 				{
-					TPair<float, float> Curve = TPair<float, float>(Timeline[TimelineIndex], Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
-					Curves.Add(Curve);
+					TPair<float, float> NewCurve = TPair<float, float>(Curve.Timeline[TimelineIndex], Curve.Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
+					Curves.Add(NewCurve);
 				}
 				MorphTargetCurves.Add(MorphTargetName, Curves);
 			}
@@ -2331,5 +2589,202 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 	};
 
 	FString IgnoredName;
-	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter);
+	return LoadAnimation_Internal(JsonAnimationObject, Duration, IgnoredName, Callback, Filter, SkeletalAnimationConfig.OverrideTrackNameFromExtension);
+}
+
+
+bool FglTFRuntimeParser::LoadSkinnedMeshRecursiveAsRuntimeLOD(const FString & NodeName, int32 & SkinIndex, const TArray<FString>&ExcludeNodes, FglTFRuntimeMeshLOD & RuntimeLOD, const FglTFRuntimeMaterialsConfig & MaterialsConfig, const FglTFRuntimeSkeletonConfig & SkeletonConfig)
+{
+	FglTFRuntimeNode Node;
+	TArray<FglTFRuntimeNode> Nodes;
+
+	if (NodeName.IsEmpty())
+	{
+		FglTFRuntimeScene Scene;
+		if (!LoadScene(0, Scene))
+		{
+			AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", "No Scene found in asset");
+			return false;
+		}
+
+		for (int32 NodeIndex : Scene.RootNodesIndices)
+		{
+			if (!LoadNodesRecursive(NodeIndex, Nodes))
+			{
+				AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", "Unable to build Node Tree from first Scene");
+				return false;
+			}
+		}
+	}
+	else
+	{
+		if (!LoadNodeByName(NodeName, Node))
+		{
+			AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", FString::Printf(TEXT("Unable to find Node \"%s\""), *NodeName));
+			return false;
+		}
+
+		if (!LoadNodesRecursive(Node.Index, Nodes))
+		{
+			AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", FString::Printf(TEXT("Unable to build Node Tree from \"%s\""), *NodeName));
+			return false;
+		}
+	}
+
+	if (SkinIndex <= INDEX_NONE)
+	{
+		// first search for skinning
+		for (FglTFRuntimeNode& ChildNode : Nodes)
+		{
+			if (ExcludeNodes.Contains(ChildNode.Name))
+			{
+				continue;
+			}
+			if (ChildNode.SkinIndex > INDEX_NONE)
+			{
+				SkinIndex = ChildNode.SkinIndex;
+				break;
+			}
+		}
+
+		if (SkinIndex <= INDEX_NONE)
+		{
+			AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", "Unable to find a valid Skin");
+			return false;
+		}
+	}
+
+	// now search for all meshes (will be all merged in the same primitives list)
+	for (FglTFRuntimeNode& ChildNode : Nodes)
+	{
+		if (ExcludeNodes.Contains(ChildNode.Name))
+		{
+			continue;
+		}
+		if (ChildNode.MeshIndex != INDEX_NONE)
+		{
+			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", ChildNode.MeshIndex);
+			if (!JsonMeshObject)
+			{
+				AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", FString::Printf(TEXT("Unable to find Mesh with index %d"), ChildNode.MeshIndex));
+				return false;
+			}
+
+			// keep track of primitives
+			int32 PrimitiveFirstIndex = RuntimeLOD.Primitives.Num();
+
+			FglTFRuntimeMeshLOD* LOD = nullptr;
+			if (!LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, MaterialsConfig))
+			{
+				return false;
+			}
+
+			RuntimeLOD.Primitives.Append(LOD->Primitives);
+
+			// Always build an override map, to have a cache of the bone/index mapping
+
+			TSharedPtr<FJsonObject> JsonSkinObject = GetJsonObjectFromRootIndex("skins", ChildNode.SkinIndex);
+			if (!JsonSkinObject)
+			{
+				AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", FString::Printf(TEXT("Unable to fill skin %d"), ChildNode.SkinIndex));
+				return false;
+			}
+
+			TMap<int32, FName> BoneMap;
+
+			FReferenceSkeleton FakeRefSkeleton;
+			if (!FillReferenceSkeleton(JsonSkinObject.ToSharedRef(), FakeRefSkeleton, BoneMap, SkeletonConfig))
+			{
+				AddError("LoadSkinnedMeshRecursiveAsRuntimeLOD()", "Unable to fill RefSkeleton.");
+				return false;
+			}
+
+			// apply overrides
+			for (int32 PrimitiveIndex = PrimitiveFirstIndex; PrimitiveIndex < RuntimeLOD.Primitives.Num(); PrimitiveIndex++)
+			{
+				FglTFRuntimePrimitive& Primitive = RuntimeLOD.Primitives[PrimitiveIndex];
+				Primitive.OverrideBoneMap = BoneMap;
+			}
+
+		}
+	}
+
+	return true;
+}
+
+USkeletalMesh* FglTFRuntimeParser::LoadSkeletalMeshFromRuntimeLODs(const TArray<FglTFRuntimeMeshLOD>&RuntimeLODs, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshConfig & SkeletalMeshConfig)
+{
+	if (RuntimeLODs.Num() < 1)
+	{
+		return nullptr;
+	}
+
+	if (RuntimeLODs[0].Primitives.Num() < 1)
+	{
+		return nullptr;
+	}
+
+	if (RuntimeLODs[0].Primitives[0].OverrideBoneMap.Num() < 1)
+	{
+		AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
+		return nullptr;
+	}
+
+	const TMap<int32, FName>& BaseBoneMap = RuntimeLODs[0].Primitives[0].OverrideBoneMap;
+
+	TSharedRef<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe> SkeletalMeshContext = MakeShared<FglTFRuntimeSkeletalMeshContext, ESPMode::ThreadSafe>(AsShared(), SkeletalMeshConfig);
+	SkeletalMeshContext->SkinIndex = SkinIndex;
+
+	SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLODs[0]));
+
+	auto ContainsBone = [BaseBoneMap](FName BoneName) -> bool
+	{
+		for (const TPair<int32, FName>& Pair : BaseBoneMap)
+		{
+			if (Pair.Value == BoneName)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
+	for (int32 LODIndex = 1; LODIndex < RuntimeLODs.Num(); LODIndex++)
+	{
+		if (RuntimeLODs[LODIndex].Primitives.Num() < 1)
+		{
+			AddError("LoadSkeletalMeshFromRuntimeLODs()", "Invalid RuntimeLOD, no Primitives defined");
+			return nullptr;
+		}
+
+		for (const FglTFRuntimePrimitive& Primitive : RuntimeLODs[LODIndex].Primitives)
+		{
+			if (Primitive.OverrideBoneMap.Num() < 1)
+			{
+				AddError("LoadSkeletalMeshFromRuntimeLODs()", "Empty Primitive OverrideBoneMap");
+				return nullptr;
+			}
+
+			FglTFRuntimePrimitive& NonConstPrimitive = const_cast<FglTFRuntimePrimitive&>(Primitive);
+
+			for (TPair<int32, FName>& Pair : NonConstPrimitive.OverrideBoneMap)
+			{
+				if (!ContainsBone(Pair.Value))
+				{
+					AddError("LoadSkeletalMeshFromRuntimeLODs()", FString::Printf(TEXT("Unknown bone %s"), *Pair.Value.ToString()));
+					return nullptr;
+				}
+			}
+		}
+
+		SkeletalMeshContext->LODs.Add(const_cast<FglTFRuntimeMeshLOD*>(&RuntimeLODs[LODIndex]));
+	}
+
+	if (!CreateSkeletalMeshFromLODs(SkeletalMeshContext))
+	{
+		AddError("LoadSkeletalMesh()", "Unable to load SkeletalMesh.");
+		return nullptr;
+	}
+
+	return FinalizeSkeletalMeshWithLODs(SkeletalMeshContext);
 }

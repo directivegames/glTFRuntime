@@ -11,15 +11,13 @@ public class glTFRuntime : ModuleRules
 
         PublicIncludePaths.AddRange(
             new string[] {
-				// ... add public include paths required here ...
-			}
+            }
             );
 
 
         PrivateIncludePaths.AddRange(
             new string[] {
-				// ... add other private include paths required here ...
-			}
+            }
             );
 
 
@@ -27,7 +25,6 @@ public class glTFRuntime : ModuleRules
             new string[]
             {
                 "Core",
-				// ... add other public dependencies that you statically link with here ...
                 "ProceduralMeshComponent"
             }
             );
@@ -44,9 +41,10 @@ public class glTFRuntime : ModuleRules
                 "ApplicationCore",
                 "HTTP",
                 "PhysicsCore",
-                "Projects"
-				// ... add private dependencies that you statically link with here ...	
-			}
+                "Projects",
+                "MeshDescription",
+                "StaticMeshDescription"
+            }
             );
 
         if (Target.Type == TargetType.Editor)
@@ -60,8 +58,7 @@ public class glTFRuntime : ModuleRules
         DynamicallyLoadedModuleNames.AddRange(
             new string[]
             {
-				// ... add any modules that your module loads dynamically here ...
-			}
+            }
             );
 
 #if true // WITH_DIRECTIVE
