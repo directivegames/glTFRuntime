@@ -3,6 +3,7 @@
 #include "RigidBodySkeletalMeshComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Engine/CollisionProfile.h"
+#include "Misc/EngineVersionComparison.h"
 
 
 URigidBodySkeletalMeshComponent::URigidBodySkeletalMeshComponent()
@@ -22,10 +23,17 @@ void URigidBodySkeletalMeshComponent::OnCreatePhysicsState()
 
 UBodySetup* URigidBodySkeletalMeshComponent::GetBodySetup()
 {
+#if UE_VERSION_OLDER_THAN(5, 0, 0)
 	if (SkeletalMesh)
 	{
 		return const_cast<const USkeletalMesh*>(SkeletalMesh.Get())->GetBodySetup();
 	}
+#else
+	if (const USkeletalMesh* Mesh = Cast<USkeletalMesh>(GetSkinnedAsset()))
+	{
+		return Mesh->GetBodySetup();
+	}
+#endif
 
 	return nullptr;
 }
