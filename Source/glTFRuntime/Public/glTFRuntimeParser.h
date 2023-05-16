@@ -18,7 +18,7 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeStats.h"
-class UDataAsset;
+#include "Engine/DataAsset.h"
 #endif
 
 #include "glTFRuntimeParser.generated.h"
