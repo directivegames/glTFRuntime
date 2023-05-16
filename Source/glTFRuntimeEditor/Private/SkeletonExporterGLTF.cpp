@@ -5,6 +5,10 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 
+#if 1 // WITH_DIRECTIVE
+#include "Misc/Base64.h"
+#endif
+
 USkeletonExporterGLTF::USkeletonExporterGLTF(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {

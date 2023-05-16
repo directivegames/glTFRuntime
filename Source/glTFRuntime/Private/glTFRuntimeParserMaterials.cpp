@@ -12,6 +12,7 @@
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeSettings.h"
 #include "glTFRuntimeStats.h"
+#include "MaterialDomain.h"
 #endif
 
 UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index, const FString& MaterialName, TSharedRef<FJsonObject> JsonMaterialObject, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
@@ -233,6 +234,23 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 				RuntimeMaterial.BaseSpecularFactor = 1;
 			}
 		}
+
+		// KHR_materials_clearcoat
+		const TSharedPtr<FJsonObject>* JsonMaterialClearCoat;
+		if ((*JsonExtensions)->TryGetObjectField("KHR_materials_clearcoat", JsonMaterialClearCoat))
+		{
+			if (!(*JsonMaterialClearCoat)->TryGetNumberField("clearcoatFactor", RuntimeMaterial.ClearCoatFactor))
+			{
+				RuntimeMaterial.ClearCoatFactor = 0;
+			}
+
+			if (!(*JsonMaterialClearCoat)->TryGetNumberField("clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor))
+			{
+				RuntimeMaterial.ClearCoatRoughnessFactor = 0;
+			}
+
+			RuntimeMaterial.bKHR_materials_clearcoat = true;
+		}
 	}
 
 	if (IsInGameThread())
@@ -249,7 +267,7 @@ UMaterialInterface* FglTFRuntimeParser::LoadMaterial_Internal(const int32 Index,
 			{
 				return;
 			}
-			Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
+	Material = BuildMaterial(Index, MaterialName, RuntimeMaterial, MaterialsConfig, bUseVertexColors);
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
 	FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 
@@ -353,6 +371,27 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	return Texture;
 }
 
+UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	UMaterialInterface* BaseMaterial = MetallicRoughnessMaterialsMap[EglTFRuntimeMaterialType::TwoSided];
+
+	if (MaterialsConfig.VertexColorOnlyMaterial)
+	{
+		BaseMaterial = MaterialsConfig.VertexColorOnlyMaterial;
+	}
+
+	UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BaseMaterial, BaseMaterial);
+	if (!Material)
+	{
+		AddError("BuildVertexColorOnlyMaterial()", "Unable to create material instance, falling back to default material");
+		return UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
+	}
+
+	Material->SetScalarParameterValue("bUseVertexColors", true);
+
+	return Material;
+}
+
 UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const FString& MaterialName, const FglTFRuntimeMaterial& RuntimeMaterial, const FglTFRuntimeMaterialsConfig& MaterialsConfig, const bool bUseVertexColors)
 {
 #if 1 // WITH_DIRECTIVE
@@ -420,6 +459,14 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		if (UnlitMaterialsMap.Contains(RuntimeMaterial.MaterialType))
 		{
 			BaseMaterial = UnlitMaterialsMap[RuntimeMaterial.MaterialType];
+		}
+	}
+
+	if (RuntimeMaterial.bKHR_materials_clearcoat)
+	{
+		if (ClearCoatMaterialsMap.Contains(RuntimeMaterial.MaterialType))
+		{
+			BaseMaterial = ClearCoatMaterialsMap[RuntimeMaterial.MaterialType];
 		}
 	}
 
@@ -566,6 +613,9 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 	Material->SetScalarParameterValue("AlphaMask", RuntimeMaterial.bMasked ? 1.0f : 0.0f);
 
 	ApplyMaterialFloatFactor(RuntimeMaterial.bHasIOR, "ior", RuntimeMaterial.IOR);
+
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatFactor", RuntimeMaterial.ClearCoatFactor);
+	ApplyMaterialFloatFactor(RuntimeMaterial.bKHR_materials_clearcoat, "clearcoatRoughnessFactor", RuntimeMaterial.ClearCoatRoughnessFactor);
 
 	for (const TPair<FString, float>& Pair : MaterialsConfig.ParamsMultiplier)
 	{
@@ -723,7 +773,11 @@ UTexture2D* FglTFRuntimeParser::LoadTexture(const int32 TextureIndex, TArray<Fgl
 			const int32 NewHeight = MaterialsConfig.ImagesConfig.MaxHeight > 0 ? MaterialsConfig.ImagesConfig.MaxHeight : Height;
 			TArray64<FColor> ResizedPixels;
 			ResizedPixels.AddUninitialized(NewWidth * NewHeight);
+#if ENGINE_MAJOR_VERSION >= 5
 			FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB, false);
+#else
+			FImageUtils::ImageResize(Width, Height, TArrayView<FColor>(reinterpret_cast<FColor*>(UncompressedBytes.GetData()), UncompressedBytes.Num()), NewWidth, NewHeight, ResizedPixels, sRGB);
+#endif
 			Width = NewWidth;
 			Height = NewHeight;
 			UncompressedBytes.Empty(ResizedPixels.Num() * 4);

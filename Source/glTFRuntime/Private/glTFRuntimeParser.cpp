@@ -11,6 +11,7 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeStats.h"
+#include "MaterialDomain.h"
 #endif
 
 DEFINE_LOG_CATEGORY(LogGLTFRuntime);
@@ -294,7 +295,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromString(const FString& Jso
 				Parser->BaseDirectory = LoaderConfig.OverrideBaseDirectory;
 			}
 		}
-
+		Parser->DefaultPrefixForUnnamedNodes = LoaderConfig.PrefixForUnnamedNodes;
 		Parser->ZipFile = InZipFile;
 	}
 
@@ -369,10 +370,8 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 	return Parser;
 }
 
-FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
+void FglTFRuntimeParser::LoadAndFillBaseMaterials()
 {
-	bAllNodesCached = false;
-
 	UMaterialInterface* OpaqueMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
 	if (OpaqueMaterial)
 	{
@@ -487,6 +486,42 @@ FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const
 		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, TrasmissionTwoSidedMaterial);
 		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, TrasmissionTwoSidedMaterial);
 		TransmissionMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, TrasmissionTwoSidedMaterial);
+	}
+
+	// KHR_materials_transmission
+	UMaterialInterface* ClearCoatMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeBase"));
+	if (ClearCoatMaterial)
+	{
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Opaque, ClearCoatMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Masked, ClearCoatMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::Translucent, ClearCoatMaterial);
+	}
+
+	UMaterialInterface* ClearCoatTwoSidedMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_ClearCoat_glTFRuntimeTwoSided_Inst"));
+	if (ClearCoatTwoSidedMaterial)
+	{
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSided, ClearCoatTwoSidedMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedMasked, ClearCoatTwoSidedMaterial);
+		ClearCoatMaterialsMap.Add(EglTFRuntimeMaterialType::TwoSidedTranslucent, ClearCoatTwoSidedMaterial);
+	}
+}
+
+
+FglTFRuntimeParser::FglTFRuntimeParser(TSharedRef<FJsonObject> JsonObject, const FMatrix& InSceneBasis, float InSceneScale) : Root(JsonObject), SceneBasis(InSceneBasis), SceneScale(InSceneScale)
+{
+	bAllNodesCached = false;
+
+	if (IsInGameThread())
+	{
+		LoadAndFillBaseMaterials();
+	}
+	else
+	{
+		FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([this]()
+			{
+				LoadAndFillBaseMaterials();
+			}, TStatId(), nullptr, ENamedThreads::GameThread);
+		FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 	}
 
 	JsonObject->TryGetStringArrayField("extensionsUsed", ExtensionsUsed);
@@ -960,7 +995,7 @@ bool FglTFRuntimeParser::GetAllNodes(TArray<FglTFRuntimeNode>& Nodes)
 	return true;
 }
 
-bool FglTFRuntimeParser::LoadNode(int32 Index, FglTFRuntimeNode& Node)
+bool FglTFRuntimeParser::LoadNode(const int32 Index, FglTFRuntimeNode& Node)
 {
 #if 1 // WITH_DIRECTIVE
 	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNode);
@@ -1080,7 +1115,7 @@ bool FglTFRuntimeParser::FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* Js
 bool FglTFRuntimeParser::LoadNode_Internal(int32 Index, TSharedRef<FJsonObject> JsonNodeObject, int32 NodesCount, FglTFRuntimeNode& Node)
 {
 	Node.Index = Index;
-	Node.Name = GetJsonObjectString(JsonNodeObject, "name", FString::FromInt(Node.Index));
+	Node.Name = GetJsonObjectString(JsonNodeObject, "name", DefaultPrefixForUnnamedNodes + FString::FromInt(Node.Index));
 
 	Node.MeshIndex = GetJsonObjectIndex(JsonNodeObject, "mesh", INDEX_NONE);
 
@@ -1735,7 +1770,51 @@ USkeleton* FglTFRuntimeParser::LoadSkeleton(const int32 SkinIndex, const FglTFRu
 	}
 
 	return Skeleton;
+}
+
+USkeleton* FglTFRuntimeParser::LoadSkeletonFromNode(const FglTFRuntimeNode& Node, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	TMap<int32, FName> BoneMap;
+
+	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(GetTransientPackage(), NAME_None, RF_Public);
+	USkeleton* Skeleton = NewObject<USkeleton>(GetTransientPackage(), NAME_None, RF_Public);
+
+#if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 26
+	FReferenceSkeleton& RefSkeleton = SkeletalMesh->GetRefSkeleton();
+#else
+	FReferenceSkeleton& RefSkeleton = SkeletalMesh->RefSkeleton;
+#endif
+
+	if (!FillReferenceSkeletonFromNode(Node, RefSkeleton, BoneMap, SkeletonConfig))
+	{
+		AddError("FillReferenceSkeleton()", "Unable to fill RefSkeleton.");
+		return nullptr;
 	}
+
+	if (SkeletonConfig.bNormalizeSkeletonScale)
+	{
+		NormalizeSkeletonScale(RefSkeleton);
+	}
+
+	if (SkeletonConfig.bClearRotations || SkeletonConfig.CopyRotationsFrom)
+	{
+		ClearSkeletonRotations(RefSkeleton);
+	}
+
+	if (SkeletonConfig.CopyRotationsFrom)
+	{
+		CopySkeletonRotationsFrom(RefSkeleton, SkeletonConfig.CopyRotationsFrom->GetReferenceSkeleton());
+	}
+
+	if (SkeletonConfig.BonesDeltaTransformMap.Num() > 0)
+	{
+		AddSkeletonDeltaTranforms(RefSkeleton, SkeletonConfig.BonesDeltaTransformMap);
+	}
+
+	Skeleton->MergeAllBonesToBoneTree(SkeletalMesh);
+
+	return Skeleton;
+}
 
 bool FglTFRuntimeParser::NodeIsBone(const int32 NodeIndex)
 {
@@ -1978,7 +2057,17 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 	return true;
 }
 
-bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+bool FglTFRuntimeParser::FillReferenceSkeletonFromNode(const FglTFRuntimeNode& RootNode, FReferenceSkeleton& RefSkeleton, TMap<int32, FName>& BoneMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	RefSkeleton.Empty();
+
+	FReferenceSkeletonModifier Modifier = FReferenceSkeletonModifier(RefSkeleton, nullptr);
+
+	// now traverse from the root and check if the node is in the "joints" list
+	return TraverseJoints(Modifier, RootNode.Index, INDEX_NONE, RootNode, {}, BoneMap, {}, SkeletonConfig);
+}
+
+bool FglTFRuntimeParser::TraverseJoints(FReferenceSkeletonModifier& Modifier, const int32 RootIndex, int32 Parent, const FglTFRuntimeNode& Node, const TArray<int32>& Joints, TMap<int32, FName>& BoneMap, const TMap<int32, FMatrix>& InverseBindMatricesMap, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
 {
 	TArray<FString> AppendBones;
 	// add fake root bone ?
@@ -2475,7 +2564,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			if (JsonTargetObject->HasField("POSITION"))
 			{
 				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "POSITION", MorphTarget.Positions,
-					{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector { return SceneBasis.TransformPosition(Value) * SceneScale; }, INDEX_NONE))
+					{ 3 }, SupportedPositionComponentTypes, false, [&](FVector Value) -> FVector { return SceneBasis.TransformPosition(Value) * SceneScale; }, INDEX_NONE))
 				{
 					AddError("LoadPrimitive()", "Unable to load POSITION attribute for MorphTarget");
 					return false;
@@ -2491,7 +2580,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			if (JsonTargetObject->HasField("NORMAL"))
 			{
 				if (!BuildFromAccessorField(JsonTargetObject.ToSharedRef(), "NORMAL", MorphTarget.Normals,
-					{ 3 }, { 5126 }, false, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }, INDEX_NONE))
+					{ 3 }, SupportedNormalComponentTypes, false, [&](FVector Value) -> FVector { return SceneBasis.TransformVector(Value); }, INDEX_NONE))
 				{
 					AddError("LoadPrimitive()", "Unable to load NORMAL attribute for MorphTarget");
 					return false;
@@ -2663,6 +2752,12 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 				AddError("LoadPrimitive()", FString::Printf(TEXT("Unable to load material %lld"), MaterialIndex));
 				return false;
 			}
+			Primitive.bHasMaterial = true;
+		}
+		// special case for primitives without a material but with a color buffer
+		else if (Primitive.Colors.Num() > 0)
+		{
+			Primitive.Material = BuildVertexColorOnlyMaterial(MaterialsConfig);
 		}
 	}
 
@@ -3893,6 +3988,33 @@ bool FglTFRuntimeParser::GetStringArrayFromExtras(const FString& Key, TArray<FSt
 	return JsonExtras->TryGetStringArrayField(Key, StringArray);
 }
 
+bool FglTFRuntimeParser::GetNumberArrayFromExtras(const FString& Key, TArray<float>& NumberArray) const
+{
+	TSharedPtr<FJsonObject> JsonExtras = GetJsonObjectExtras(Root);
+	if (!JsonExtras)
+	{
+		return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!JsonExtras->TryGetArrayField(Key, JsonArray))
+	{
+		return false;
+	}
+
+	for (const TSharedPtr<FJsonValue>& JsonItem : *JsonArray)
+	{
+		double Value = 0;
+		if (!JsonItem->TryGetNumber(Value))
+		{
+			return false;
+		}
+		NumberArray.Add(Value);
+	}
+
+	return true;
+}
+
 TSharedPtr<FJsonObject> FglTFRuntimeParser::GetNodeExtensionObject(const int32 NodeIndex, const FString& ExtensionName)
 {
 	TSharedPtr<FJsonObject> JsonNodeObject = GetJsonObjectFromRootIndex("nodes", NodeIndex);
@@ -3926,7 +4048,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 		if (BaseLine.Num() < 16)
 		{
 			BaseLine.AddZeroed(16 - BaseLine.Num());
-	}
+		}
 
 		const int64 MaxBlockElements = FMath::Min<int64>((8192 / Stride) & ~15, 256);
 
@@ -4089,7 +4211,7 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 			}
 		}
 
-}
+	}
 	else if (Mode == "TRIANGLES" && Blob.Num >= 17 && Blob.Data[0] == 0xe1 && (Stride == 2 || Stride == 4) && ((Elements % 3) == 0))
 	{
 		TArray<uint8> CodeAux;
@@ -4509,6 +4631,32 @@ bool FglTFRuntimeParser::DecompressMeshOptimizer(const FglTFRuntimeBlob& Blob, c
 	return true;
 }
 
+FTransform FglTFRuntimeParser::GetParentNodeWorldTransform(const FglTFRuntimeNode& Node)
+{
+	FTransform WorldTransform = FTransform::Identity;
+	int32 ParentIndex = Node.ParentIndex;
+	while (ParentIndex > INDEX_NONE)
+	{
+		FglTFRuntimeNode ParentNode;
+		if (!LoadNode(ParentIndex, ParentNode))
+		{
+			UE_LOG(LogTemp, Error, TEXT("OOOOPS"));
+			break;
+		}
+
+		WorldTransform = ParentNode.Transform * WorldTransform;
+		ParentIndex = ParentNode.ParentIndex;
+	}
+
+	return WorldTransform;
+}
+
+FTransform FglTFRuntimeParser::GetNodeWorldTransform(const FglTFRuntimeNode& Node)
+{
+	return GetParentNodeWorldTransform(Node) * Node.Transform;
+}
+
+
 #if 1 // WITH_DIRECTIVE
 #include "UObject/ConstructorHelpers.h"
 
@@ -4533,3 +4681,4 @@ UglTFMaterialLoader::UglTFMaterialLoader()
 	}
 }
 #endif
+

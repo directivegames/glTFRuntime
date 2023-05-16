@@ -40,6 +40,28 @@ bool UglTFRuntimeAsset::LoadFromFilename(const FString& Filename, const FglTFRun
 	return Parser != nullptr;
 }
 
+bool UglTFRuntimeAsset::SetParser(TSharedRef<FglTFRuntimeParser> InParser)
+{
+	// asset already loaded ?
+	if (Parser)
+	{
+		return false;
+	}
+
+	Parser = InParser;
+	if (Parser)
+	{
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnErrorProxy));
+		Parser->OnError.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnStaticMeshCreatedProxy));
+		Parser->OnStaticMeshCreated.Add(Delegate);
+		Delegate.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UglTFRuntimeAsset, OnSkeletalMeshCreatedProxy));
+		Parser->OnSkeletalMeshCreated.Add(Delegate);
+	}
+	return Parser != nullptr;
+}
+
 bool UglTFRuntimeAsset::LoadFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
 	// asset already loaded ?
@@ -324,6 +346,32 @@ USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRun
 	GLTF_CHECK_PARSER(nullptr);
 
 	return Parser->LoadSkeleton(SkinIndex, SkeletonConfig);
+}
+
+USkeleton* UglTFRuntimeAsset::LoadSkeletonFromNodeTree(const int32 NodeIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	FglTFRuntimeNode Node;
+	if (!Parser->LoadNode(NodeIndex, Node))
+	{
+		return nullptr;
+	}
+
+	return Parser->LoadSkeletonFromNode(Node, SkeletonConfig);
+}
+
+USkeleton* UglTFRuntimeAsset::LoadSkeletonFromNodeTreeByName(const FString& NodeName, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
+{
+	GLTF_CHECK_PARSER(nullptr);
+
+	FglTFRuntimeNode Node;
+	if (!Parser->LoadNodeByName(NodeName, Node))
+	{
+		return nullptr;
+	}
+
+	return Parser->LoadSkeletonFromNode(Node, SkeletonConfig);
 }
 
 UAnimSequence* UglTFRuntimeAsset::LoadSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 AnimationIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
@@ -779,6 +827,41 @@ bool UglTFRuntimeAsset::GetNodeExtensionIndices(const int32 NodeIndex, const FSt
 	}
 
 	Indices = Parser->GetJsonExtensionObjectIndices(NodeObject.ToSharedRef(), ExtensionName, FieldName);
+	return true;
+}
+
+bool UglTFRuntimeAsset::GetNodeExtrasNumbers(const int32 NodeIndex, const FString& Key, TArray<float>& Values)
+{
+	GLTF_CHECK_PARSER(false);
+
+	TSharedPtr<FJsonObject> NodeObject = Parser->GetNodeObject(NodeIndex);
+	if (!NodeObject)
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> NodeExtrasObject = Parser->GetJsonObjectExtras(NodeObject.ToSharedRef());
+	if (!NodeExtrasObject)
+	{
+		return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	if (!NodeExtrasObject->TryGetArrayField(Key, JsonArray))
+	{
+		return false;
+	}
+
+	for (const TSharedPtr<FJsonValue>& JsonItem : *JsonArray)
+	{
+		double Value = 0;
+		if (!JsonItem->TryGetNumber(Value))
+		{
+			return false;
+		}
+		Values.Add(Value);
+	}
+
 	return true;
 }
 
