@@ -20,7 +20,9 @@ public class RuntimeCollision : ModuleRules
 
         if (Target.Platform == UnrealTargetPlatform.Win64 || 
             Target.Platform == UnrealTargetPlatform.Mac ||
+#if !UE_5_3_OR_LATER
             Target.Platform == UnrealTargetPlatform.HoloLens ||
+#endif
 			Target.Platform == UnrealTargetPlatform.IOS ||
             Target.Platform == UnrealTargetPlatform.Android ||
             Target.IsInPlatformGroup(UnrealPlatformGroup.Unix))
