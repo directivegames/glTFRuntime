@@ -2035,6 +2035,7 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		}
 	}
 
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
 	{
@@ -2042,8 +2043,10 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		if (!AnimSequence->GetSkeleton()->GetSmartNameByName(USkeleton::AnimCurveMappingName, Pair.Key, SmartName))
 		{
 			SmartName.DisplayName = Pair.Key;
+
 			AnimSequence->GetSkeleton()->VerifySmartName(USkeleton::AnimCurveMappingName, SmartName);
 		}
+#endif
 
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
@@ -2474,6 +2477,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	AnimSequence->GetController().InitializeModel();
 #endif
 
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
 	{
@@ -2483,6 +2487,7 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 			SmartName.DisplayName = Pair.Key;
 			AnimSequence->GetSkeleton()->VerifySmartName(USkeleton::AnimCurveMappingName, SmartName);
 		}
+#endif
 
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
