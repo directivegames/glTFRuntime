@@ -47,6 +47,7 @@
 #if 1 // WITH_DIRECTIVE
 #include "glTFRuntimeStats.h"
 #include "Engine/SkinnedAssetCommon.h"
+#include "Misc/EngineVersionComparison.h"
 #endif
 
 struct FglTFRuntimeSkeletalMeshContextFinalizer
@@ -2035,10 +2036,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 		}
 	}
 
-#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
 	{
+		
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 		FSmartName SmartName;
 		if (!AnimSequence->GetSkeleton()->GetSmartNameByName(USkeleton::AnimCurveMappingName, Pair.Key, SmartName))
 		{
@@ -2051,7 +2053,13 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 		FAnimationCurveIdentifier CurveId(SmartName, ERawCurveTrackTypes::RCT_Float);
+#else
+		FAnimationCurveIdentifier CurveId(Pair.Key, ERawCurveTrackTypes::RCT_Float);
+#endif
+
 		AnimSequence->GetController().AddCurve(CurveId);
 		FRichCurve RichCurve;
 #else
@@ -2477,10 +2485,10 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 	AnimSequence->GetController().InitializeModel();
 #endif
 
-#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
-	{
+	{		
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 		FSmartName SmartName;
 		if (!AnimSequence->GetSkeleton()->GetSmartNameByName(USkeleton::AnimCurveMappingName, Pair.Key, SmartName))
 		{
@@ -2492,7 +2500,13 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 #if ENGINE_MAJOR_VERSION > 4
 #if WITH_EDITOR
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 		FAnimationCurveIdentifier CurveId(SmartName, ERawCurveTrackTypes::RCT_Float);
+#else
+		FAnimationCurveIdentifier CurveId(Pair.Key, ERawCurveTrackTypes::RCT_Float);
+#endif
+
 		AnimSequence->GetController().AddCurve(CurveId);
 		FRichCurve RichCurve;
 #else
