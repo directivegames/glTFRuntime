@@ -2039,15 +2039,16 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh * Skeleta
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
 	{
-		
-#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 		FSmartName SmartName;
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
 		if (!AnimSequence->GetSkeleton()->GetSmartNameByName(USkeleton::AnimCurveMappingName, Pair.Key, SmartName))
 		{
 			SmartName.DisplayName = Pair.Key;
 
 			AnimSequence->GetSkeleton()->VerifySmartName(USkeleton::AnimCurveMappingName, SmartName);
 		}
+#else
+		SmartName.DisplayName = Pair.Key;
 #endif
 
 #if ENGINE_MAJOR_VERSION > 4
@@ -2487,14 +2488,16 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 
 	// add MorphTarget curves
 	for (TPair<FName, TArray<TPair<float, float>>>& Pair : MorphTargetCurves)
-	{		
-#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE
+	{
 		FSmartName SmartName;
+#if UE_VERSION_OLDER_THAN(5, 3, 0) // WITH_DIRECTIVE		
 		if (!AnimSequence->GetSkeleton()->GetSmartNameByName(USkeleton::AnimCurveMappingName, Pair.Key, SmartName))
 		{
 			SmartName.DisplayName = Pair.Key;
 			AnimSequence->GetSkeleton()->VerifySmartName(USkeleton::AnimCurveMappingName, SmartName);
 		}
+#else
+		SmartName.DisplayName = Pair.Key;
 #endif
 
 #if ENGINE_MAJOR_VERSION > 4
