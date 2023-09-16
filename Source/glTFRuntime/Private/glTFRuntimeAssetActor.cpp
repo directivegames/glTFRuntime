@@ -1,4 +1,4 @@
-// Copyright 2020, Roberto De Ioris.
+// Copyright 2020-2023, Roberto De Ioris.
 
 
 #include "glTFRuntimeAssetActor.h"
@@ -7,6 +7,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Animation/AnimSequence.h"
+#include "glTFRuntimeSkeletalMeshComponent.h"
 
 #if 1 // WITH_DIRECTIVE
 #include "RigidBodySkeletalMeshComponent.h"
@@ -152,8 +153,8 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		NewCameraComponent->RegisterComponent();
 		NewCameraComponent->SetRelativeTransform(Node.Transform);
 		AddInstanceComponent(NewCameraComponent);
-#endif		
-		
+#endif
+
 		Asset->LoadCamera(Node.CameraIndex, NewCameraComponent);
 		NewComponent = NewCameraComponent;
 
@@ -187,18 +188,18 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		NewComponent->RegisterComponent();
 		NewComponent->SetRelativeTransform(Node.Transform);
 		AddInstanceComponent(NewComponent);
-#endif		
+#endif	
 	}
 	else
 	{
 #if 1 // WITH_DIRECTIVE
 		UE_LOG(LogTemp, Log, TEXT("ProcessNode: %s with transform [%s]"), *Node.Name, *Node.Transform.ToString());
-#endif		
+#endif
 		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
 		{
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(AddStaticMeshComponent);
-#endif			
+#endif
 			UStaticMeshComponent* StaticMeshComponent = nullptr;
 			TArray<FTransform> GPUInstancingTransforms;
 			if (Asset->GetNodeGPUInstancingTransforms(Node.Index, GPUInstancingTransforms))
@@ -216,7 +217,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), GetSafeNodeName<UStaticMeshComponent>(Node));
 #else				
 				StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
-#endif				
+#endif
 			}
 
 			if (!NodeParentComponent)
@@ -229,12 +230,13 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			}
 			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
+
 #if 1 // WITH_DIRECTIVE
 			CustomAddInstanceComponent(StaticMeshComponent);
 			FglTFRuntimeParser::AddStaticMeshComponentReference(StaticMeshComponent);
 #else			
 			AddInstanceComponent(StaticMeshComponent);
-#endif			
+#endif
 
 #if 0 // WITH_DIRECTIVE
 			// The loaded static mesh might be cached somewhere for re-use
@@ -244,7 +246,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				StaticMeshConfig.Outer = StaticMeshComponent;
 			}
 #endif
-			
+
 			TArray<int32> MeshIndices;
 			MeshIndices.Add(Node.MeshIndex);
 
@@ -298,17 +300,31 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		}
 		else
 		{
+			USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(AddSkeletalMeshComponent);
-			USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
-			if (SkeletalMeshConfig.bBuildSimpleCollision)
-			{
-				SkeletalMeshComponent = NewObject<URigidBodySkeletalMeshComponent>(GetComponentOwner(), GetSafeNodeName<USkeletalMeshComponent>(Node));
-			}
-			else
+			if (!SkeletalMeshConfig.bPerPolyCollision)
 			{
 				SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(GetComponentOwner(), GetSafeNodeName<USkeletalMeshComponent>(Node));
-			}			
+			}
+			else
+			{
+				SkeletalMeshComponent = NewObject<UglTFRuntimeSkeletalMeshComponent>(GetComponentOwner(), GetSafeNodeName<UglTFRuntimeSkeletalMeshComponent>(Node));
+				SkeletalMeshComponent->bEnablePerPolyCollision = true;
+				SkeletalMeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			}
+#else
+			if (!SkeletalMeshConfig.bPerPolyCollision)
+			{
+				SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, GetSafeNodeName<USkeletalMeshComponent>(Node));
+			}
+			else
+			{
+				SkeletalMeshComponent = NewObject<UglTFRuntimeSkeletalMeshComponent>(this, GetSafeNodeName<UglTFRuntimeSkeletalMeshComponent>(Node));
+				SkeletalMeshComponent->bEnablePerPolyCollision = true;
+				SkeletalMeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			}
+#endif
 			if (!NodeParentComponent)
 			{
 				SetRootComponent(SkeletalMeshComponent);
@@ -319,25 +335,15 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			}
 			SkeletalMeshComponent->RegisterComponent();
 			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
+#if 1 // WITH_DIRECTIVE
 			CustomAddInstanceComponent(SkeletalMeshComponent);
 #else
-			USkeletalMeshComponent* SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(this, GetSafeNodeName<USkeletalMeshComponent>(Node));
-			if (!NodeParentComponent)
-			{
-				SetRootComponent(SkeletalMeshComponent);
-			}
-			else
-			{
-				SkeletalMeshComponent->SetupAttachment(bForceSkinnedMeshToRoot ? GetRootComponent() : NodeParentComponent);
-			}
-			SkeletalMeshComponent->RegisterComponent();
-			SkeletalMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(SkeletalMeshComponent);
+#endif
 			if (SkeletalMeshConfig.Outer == nullptr)
 			{
 				SkeletalMeshConfig.Outer = SkeletalMeshComponent;
 			}
-#endif			
 			USkeletalMesh* SkeletalMesh = Asset->LoadSkeletalMesh(Node.MeshIndex, Node.SkinIndex, SkeletalMeshConfig);
 			SkeletalMeshComponent->SetSkeletalMesh(SkeletalMesh);
 			DiscoveredSkeletalMeshComponents.Add(SkeletalMeshComponent);
@@ -405,7 +411,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		{
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(LoadAnimationCurves);
-#endif			
+#endif
 			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
 			TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
 			for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
@@ -435,7 +441,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			if (!SkeletalAnimation && bAllowPoseAnimations)
 			{
 				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
-	}
+			}
 #else
 			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
 			if (!SkeletalAnimation && bAllowPoseAnimations)
@@ -450,8 +456,8 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
 				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 			}
-}
 	}
+}
 
 	OnNodeProcessed.Broadcast(Node, NewComponent);
 
@@ -531,6 +537,16 @@ void AglTFRuntimeAssetActor::ReceiveOnStaticMeshComponentCreated_Implementation(
 void AglTFRuntimeAssetActor::ReceiveOnSkeletalMeshComponentCreated_Implementation(USkeletalMeshComponent* SkeletalMeshComponent, const FglTFRuntimeNode& Node)
 {
 
+}
+
+void AglTFRuntimeAssetActor::PostUnregisterAllComponents()
+{
+	if (Asset)
+	{
+		Asset->ClearCache();
+		Asset = nullptr;
+	}
+	Super::PostUnregisterAllComponents();
 }
 
 #if 1 // WITH_DIRECTIVE

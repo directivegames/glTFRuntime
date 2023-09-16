@@ -1,8 +1,9 @@
-// Copyright 2021, Roberto De Ioris.
+// Copyright 2021-2023, Roberto De Ioris.
 
 
 #include "glTFRuntimeAssetActorAsync.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 
 // Sets default values
@@ -15,6 +16,7 @@ AglTFRuntimeAssetActorAsync::AglTFRuntimeAssetActorAsync()
 	RootComponent = AssetRoot;
 
 	bShowWhileLoading = true;
+	bStaticMeshesAsSkeletal = false;
 }
 
 // Called when the game starts or when spawned
@@ -78,7 +80,7 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 	}
 	else
 	{
-		if (Node.SkinIndex < 0)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
 		{
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
@@ -249,4 +251,14 @@ void AglTFRuntimeAssetActorAsync::ScenesLoaded()
 void AglTFRuntimeAssetActorAsync::ReceiveOnScenesLoaded_Implementation()
 {
 
+}
+
+void AglTFRuntimeAssetActorAsync::PostUnregisterAllComponents()
+{
+	if (Asset)
+	{
+		Asset->ClearCache();
+		Asset = nullptr;
+	}
+	Super::PostUnregisterAllComponents();
 }

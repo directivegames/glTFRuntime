@@ -102,6 +102,8 @@ public:
 	DECLARE_MULTICAST_DELEGATE_TwoParams(FglTFRuntimeAssetActorNodeProcessed, const FglTFRuntimeNode&, USceneComponent*);
 	FglTFRuntimeAssetActorNodeProcessed OnNodeProcessed;
 
+	virtual void PostUnregisterAllComponents() override;
+
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"), Category="glTFRuntime")
 	USceneComponent* AssetRoot;
