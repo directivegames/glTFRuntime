@@ -42,4 +42,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Make glTFRuntime PathItem Array from JSONPath String"), Category = "glTFRuntime")
 	static TArray<FglTFRuntimePathItem> glTFRuntimePathItemArrayFromJSONPath(const FString& JSONPath);
+
+#if 1 // WITH_DIRECTIVE
+	/*
+	* Spawn the asset contained in 'Asset' onto 'Actor' at the specified 'RelativeTransform'.
+	* If the actor is null, a new 'glTFRuntimeAssetActor' will be created.
+	*/
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "glTF Spawn Asset On Actor"), Category = "glTFRuntime")
+	static bool glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+									  const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+#endif
 };

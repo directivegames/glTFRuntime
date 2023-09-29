@@ -9,6 +9,11 @@
 #include "Interfaces/IHttpResponse.h"
 #include "Runtime/Launch/Resources/Version.h"
 
+#if 1 // WITH_DIRECTIVE
+#include "glTFRuntimeAssetActor.h"
+#endif
+
+
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
 {
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
@@ -252,3 +257,47 @@ TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArr
 
 	return Paths;
 }
+
+#if 1 // WITH_DIRECTIVE
+bool UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+														const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	if (ensure(WorldContextObject && Asset))
+	{
+		auto World = WorldContextObject->GetWorld();
+		if (ensure(World))
+		{
+			auto TempActor = World->SpawnActorDeferred<AglTFRuntimeAssetActor>(AglTFRuntimeAssetActor::StaticClass(), FTransform::Identity, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+			TempActor->Asset = Asset;
+			if (!Actor)
+			{
+				Actor = TempActor;
+			}
+
+			if (RelativeTransform.Equals(FTransform::Identity))
+			{
+				TempActor->DelegateRootComponent = Actor->GetRootComponent();
+			}
+			else
+			{
+				auto SceneComponent = NewObject<USceneComponent>(Actor);
+				SceneComponent->SetupAttachment(Actor->GetRootComponent());
+				SceneComponent->SetRelativeTransform(RelativeTransform);
+				SceneComponent->RegisterComponent();
+				TempActor->DelegateRootComponent = SceneComponent;
+			}
+			TempActor->StaticMeshConfig = StaticMeshConfig;
+			TempActor->SkeletalMeshConfig = SkeletalMeshConfig;
+			TempActor->FinishSpawning(FTransform::Identity);
+
+			if (Actor != TempActor)
+			{
+				TempActor->SetLifeSpan(0.1f);
+			}
+
+			return true;
+		}
+	}
+	return false;
+}
+#endif
