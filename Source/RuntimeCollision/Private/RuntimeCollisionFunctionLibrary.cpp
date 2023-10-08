@@ -1,11 +1,14 @@
 // Copyright (C) 2020 - Directive Games Limited - All Rights Reserved
 
 #include "RuntimeCollisionFunctionLibrary.h"
+#if UE_EDITOR
 #include "ConvexDecompTool.h"
+#else
+#include "NonEditor/ConvexDecompTool.h"
+#endif
 #include "Engine/StaticMesh.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "RuntimeCollision.h"
-
 
 // Internally we keep a record of all the running generators, so that the caller doesn't need to keep a copy to make them alive
 static TArray<TSharedPtr<FAsyncConvexCollisionGenerator>> AllGenerators;

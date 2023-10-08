@@ -35,5 +35,10 @@ public class RuntimeCollision : ModuleRules
         }
 
         PrivateDefinitions.Add("CUSTOM_ENGINE=1");
+
+        if (Target.bBuildEditor)
+        {
+            PrivateDependencyModuleNames.Add("PhysicsUtilities");
+        }
     }
 }

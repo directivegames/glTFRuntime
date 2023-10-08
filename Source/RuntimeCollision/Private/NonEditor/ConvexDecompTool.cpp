@@ -4,7 +4,9 @@
     ConvexDecompTool.cpp: Utility for turning graphics mesh into convex hulls.
 =============================================================================*/
 
-#include "ConvexDecompTool.h"
+#if !UE_EDITOR
+
+#include "NonEditor/ConvexDecompTool.h"
 
 #include "Misc/FeedbackContext.h"
 #include "PhysicsEngine/ConvexElem.h"
@@ -456,3 +458,5 @@ IDecomposeMeshToHullsAsync *CreateIDecomposeMeshToHullAsync(void)
     FDecomposeMeshToHullsAsyncImpl *d = new FDecomposeMeshToHullsAsyncImpl;
     return static_cast<IDecomposeMeshToHullsAsync *>(d);
 }
+
+#endif

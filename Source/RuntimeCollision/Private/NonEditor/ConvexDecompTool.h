@@ -8,6 +8,8 @@
 
 #include "CoreMinimal.h"
 
+#if !UE_EDITOR
+
 /** This pre-processor define specifies the default
     voxel resolution when performing V-HACD.
     The default value is one hundred thousands voxels.
@@ -61,3 +63,6 @@ protected:
 
 // Creates the interface to the asynchronous convex decomposition tool chain
 RUNTIMECOLLISION_API IDecomposeMeshToHullsAsync *CreateIDecomposeMeshToHullAsync(void);
+
+#endif
+
