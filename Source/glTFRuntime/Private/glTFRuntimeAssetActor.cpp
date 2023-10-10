@@ -297,6 +297,9 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			StaticMeshComponent->SetStaticMesh(StaticMesh);
 			ReceiveOnStaticMeshComponentCreated(StaticMeshComponent, Node);
 			NewComponent = StaticMeshComponent;
+#if 1 // WITH_DIRECTIVE
+			StaticMeshConfig.StaticMeshComponentProcessor.ExecuteIfBound(StaticMeshComponent);
+#endif
 		}
 		else
 		{
@@ -349,6 +352,9 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			DiscoveredSkeletalMeshComponents.Add(SkeletalMeshComponent);
 			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
 			NewComponent = SkeletalMeshComponent;
+#if 1 // WITH_DIRECTIVE
+			SkeletalMeshConfig.SkeletalMeshComponentProcessor.ExecuteIfBound(SkeletalMeshComponent);
+#endif
 		}
 	}
 

@@ -579,7 +579,9 @@ struct FConvexCollisionGenerationConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	int32 HullPrecision = 100000;
 };
-#endif
+
+DECLARE_DYNAMIC_DELEGATE_OneParam(FStaticMeshComponentProcessor, UStaticMeshComponent*, StaticMeshComponent);
+#endif // WITH_DIRECTIVE
 
 USTRUCT(BlueprintType)
 struct FglTFRuntimeStaticMeshConfig
@@ -655,6 +657,9 @@ struct FglTFRuntimeStaticMeshConfig
 #if 1 // WITH_DIRECTIVE
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FConvexCollisionGenerationConfig ConvexCollisionConfig;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FStaticMeshComponentProcessor StaticMeshComponentProcessor;
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -1021,6 +1026,10 @@ struct FglTFRuntimeBoneBoundsFilterHook
 	UObject* Context = nullptr;
 };
 
+#if 1 // WITH_DIRECTIVE
+DECLARE_DYNAMIC_DELEGATE_OneParam(FSkeletalMeshComponentProcessor, USkeletalMeshComponent*, SkeletalMeshComponent);
+#endif
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeSkeletalMeshConfig
 {
@@ -1083,6 +1092,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bLoadSkeletalAnimations = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	FSkeletalMeshComponentProcessor SkeletalMeshComponentProcessor;
 
 	// If specified, only the morph targets whitelisted will be loaded
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
