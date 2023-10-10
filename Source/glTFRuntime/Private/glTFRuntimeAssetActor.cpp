@@ -199,12 +199,17 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		{
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(AddStaticMeshComponent);
+			const auto Flags = StaticMeshConfig.bCreateAsDefaultSubObject ? RF_DefaultSubObject : RF_NoFlags;
 #endif
 			UStaticMeshComponent* StaticMeshComponent = nullptr;
 			TArray<FTransform> GPUInstancingTransforms;
 			if (Asset->GetNodeGPUInstancingTransforms(Node.Index, GPUInstancingTransforms))
 			{
+#if 1 // WITH_DIRECTIVE
+				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(GetComponentOwner(), GetSafeNodeName<UInstancedStaticMeshComponent>(Node), Flags);
+#else
 				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(this, GetSafeNodeName<UInstancedStaticMeshComponent>(Node));
+#endif
 				for (const FTransform& GPUInstanceTransform : GPUInstancingTransforms)
 				{
 					InstancedStaticMeshComponent->AddInstance(GPUInstanceTransform);
@@ -214,7 +219,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			else
 			{
 #if 1 // WITH_DIRECTIVE
-				StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), GetSafeNodeName<UStaticMeshComponent>(Node));
+				StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), GetSafeNodeName<UStaticMeshComponent>(Node), Flags);
 #else				
 				StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 #endif
@@ -305,14 +310,15 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		{
 			USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 #if 1 // WITH_DIRECTIVE
+			const auto Flags = SkeletalMeshConfig.bCreateAsDefaultSubObject ? RF_DefaultSubObject : RF_NoFlags;
 			TRACE_CPUPROFILER_EVENT_SCOPE(AddSkeletalMeshComponent);
 			if (!SkeletalMeshConfig.bPerPolyCollision)
 			{
-				SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(GetComponentOwner(), GetSafeNodeName<USkeletalMeshComponent>(Node));
+				SkeletalMeshComponent = NewObject<USkeletalMeshComponent>(GetComponentOwner(), GetSafeNodeName<USkeletalMeshComponent>(Node), Flags);
 			}
 			else
 			{
-				SkeletalMeshComponent = NewObject<UglTFRuntimeSkeletalMeshComponent>(GetComponentOwner(), GetSafeNodeName<UglTFRuntimeSkeletalMeshComponent>(Node));
+				SkeletalMeshComponent = NewObject<UglTFRuntimeSkeletalMeshComponent>(GetComponentOwner(), GetSafeNodeName<UglTFRuntimeSkeletalMeshComponent>(Node), Flags);
 				SkeletalMeshComponent->bEnablePerPolyCollision = true;
 				SkeletalMeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 			}

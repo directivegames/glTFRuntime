@@ -660,6 +660,9 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FStaticMeshComponentProcessor StaticMeshComponentProcessor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bCreateAsDefaultSubObject = false;
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -1092,6 +1095,9 @@ struct FglTFRuntimeSkeletalMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bLoadSkeletalAnimations = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	bool bCreateAsDefaultSubObject = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	FSkeletalMeshComponentProcessor SkeletalMeshComponentProcessor;
