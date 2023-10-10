@@ -737,8 +737,15 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 		auto bHasConvexCollision = false;
 		if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
 		{
-			const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
-			bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
+			if (StaticMeshConfig.bGenerateStaticMeshDescription)
+			{
+				const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
+				bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
+			}
+			else
+			{
+				AddError("FinalizeStaticMesh", "Unable to generate convex collision without FglTFRuntimeStaticMeshConfig::bGenerateStaticMeshDescription = true!");
+			}
 		}
 
 		if (bHasConvexCollision)
