@@ -2280,6 +2280,16 @@ protected:
 	TMap<int32, USkeletalMesh*> SkeletalMeshesCache;
 	TMap<int32, UTexture2D*> TexturesCache;
 
+#if 1 // WITH_DIRECTIVE
+	struct FParsedAnimationCurves
+	{
+		FString Name;
+		TArray<FglTFRuntimeAnimationCurve> Samplers;
+	};
+	TMap<int32, TArray<UglTFRuntimeAnimationCurve*>> AnimationCurvesCache;
+	TMap<TSharedPtr<FJsonObject>, FParsedAnimationCurves> ParsedAnimationCurvesCache;
+#endif
+
 	TMap<int32, TArray64<uint8>> BuffersCache;
 	TMap<int32, TArray64<uint8>> CompressedBufferViewsCache;
 	TMap<int32, int64> CompressedBufferViewsStridesCache;

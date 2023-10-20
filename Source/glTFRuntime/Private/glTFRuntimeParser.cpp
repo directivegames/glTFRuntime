@@ -1252,6 +1252,8 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 {
 #if 1 // WITH_DIRECTIVE
 	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadAnimation_Internal);
+	if (!ParsedAnimationCurvesCache.Contains(JsonAnimationObject))
+	{
 #endif
 
 	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
@@ -1324,6 +1326,14 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 
 		Samplers.Add(AnimationCurve);
 	}
+#if 1 // WITH_DIRECTIVE
+		FParsedAnimationCurves Result { Name, Samplers };
+		ParsedAnimationCurvesCache.Add(JsonAnimationObject, Result);
+	}
+	const auto& Cache = ParsedAnimationCurvesCache[JsonAnimationObject];
+	Name = Cache.Name;
+	const auto& Samplers = Cache.Samplers;
+#endif
 
 
 	const TArray<TSharedPtr<FJsonValue>>* JsonChannels;
@@ -1524,6 +1534,12 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 
 TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurves(const int32 NodeIndex)
 {
+#if 1 // WITH_DIRECTIVE
+	if (auto Record = AnimationCurvesCache.Find(NodeIndex))
+	{
+		return *Record;
+	}
+#endif
 	TArray<UglTFRuntimeAnimationCurve*> AnimationCurves;
 
 	FglTFRuntimeNode Node;
@@ -1612,6 +1628,10 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 			AnimationCurves.Add(AnimationCurve);
 		}
 	}
+
+#if 1 // WITH_DIRECTIVE
+	AnimationCurvesCache.Add(NodeIndex, AnimationCurves);
+#endif
 
 	return AnimationCurves;
 }
@@ -3588,6 +3608,13 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(SpecularGlossinessMaterialsMap);
 	Collector.AddReferencedObjects(UnlitMaterialsMap);
 	Collector.AddReferencedObjects(TransmissionMaterialsMap);
+
+#if 1 // WITH_DIRECTIVE
+	for (auto& Itr : AnimationCurvesCache)
+	{
+		Collector.AddReferencedObjects(Itr.Value);
+	}	
+#endif
 }
 
 void FglTFRuntimeParser::ClearCache()
