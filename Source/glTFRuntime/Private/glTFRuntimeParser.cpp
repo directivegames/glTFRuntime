@@ -1367,6 +1367,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 		auto Result = MakeShared<FParsedAnimationCurves>();
 		ParsedAnimationCurvesCache.Add(JsonAnimationObject, Result);
 		Result->Name = Name;
+		Result->Duration = Duration;
 		Result->Samplers = Samplers;
 		// cache the channels
 		const TArray<TSharedPtr<FJsonValue>>* JsonChannels = nullptr;
@@ -1422,6 +1423,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 
 	const auto& Cache = ParsedAnimationCurvesCache[JsonAnimationObject];
 	Name = Cache->Name;
+	Duration = Cache->Duration;
 	const auto& Samplers = Cache->Samplers;
 	if (Cache->JsonChannels.IsEmpty())
 	{

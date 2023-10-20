@@ -2308,6 +2308,7 @@ protected:
 	struct FParsedAnimationCurves
 	{
 		FString Name;
+		float Duration = 0.f;
 		TArray<FglTFRuntimeAnimationCurve> Samplers;
 		TArray<FChannelObject> JsonChannels;
 	};
