@@ -1292,99 +1292,196 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 	{
 #endif
 
-	Name = GetJsonObjectString(JsonAnimationObject, "name", "");
+		Name = GetJsonObjectString(JsonAnimationObject, "name", "");
 
-	const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
-	if (!JsonAnimationObject->TryGetArrayField("samplers", JsonSamplers))
+		const TArray<TSharedPtr<FJsonValue>>* JsonSamplers;
+		if (!JsonAnimationObject->TryGetArrayField("samplers", JsonSamplers))
+		{
+			return false;
+		}
+
+		Duration = 0.f;
+
+		TArray<FglTFRuntimeAnimationCurve> Samplers;
+
+		for (int32 SamplerIndex = 0; SamplerIndex < JsonSamplers->Num(); SamplerIndex++)
+		{
+			TSharedPtr<FJsonObject> JsonSamplerObject = (*JsonSamplers)[SamplerIndex]->AsObject();
+			if (!JsonSamplerObject)
+			{
+				return false;
+			}
+
+			FglTFRuntimeAnimationCurve AnimationCurve;
+
+			if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", AnimationCurve.Timeline, { EGLTFComponentType::Float }, INDEX_NONE, false, nullptr))
+			{
+				AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"input\" from sampler %d"), SamplerIndex));
+				return false;
+			}
+
+			if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", AnimationCurve.Values, { 1, 3, 4 }, { EGLTFComponentType::Float, EGLTFComponentType::Int8, EGLTFComponentType::UInt8, EGLTFComponentType::Int16, EGLTFComponentType::UInt16 }, INDEX_NONE, true, nullptr))
+			{
+				AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"output\" from sampler %d"), SamplerIndex));
+				return false;
+			}
+
+			FString SamplerInterpolation;
+			if (!JsonSamplerObject->TryGetStringField("interpolation", SamplerInterpolation))
+			{
+				SamplerInterpolation = "LINEAR";
+			}
+
+			// get animation valid duration
+			for (float Time : AnimationCurve.Timeline)
+			{
+				if (Time > Duration)
+				{
+					Duration = Time;
+				}
+			}
+
+			// extract tangents and value (unfortunately Unreal does not support Cubic Splines for skeletal animations)
+			if (SamplerInterpolation == "CUBICSPLINE")
+			{
+				TArray<FVector4> CubicValues;
+				for (int32 TimeIndex = 0; TimeIndex < AnimationCurve.Timeline.Num(); TimeIndex++)
+				{
+					// gather A, V and B
+					FVector4 InTangent = AnimationCurve.Values[TimeIndex * 3];
+					FVector4 Value = AnimationCurve.Values[TimeIndex * 3 + 1];
+					FVector4 OutTangent = AnimationCurve.Values[TimeIndex * 3 + 2];
+
+					AnimationCurve.InTangents.Add(InTangent);
+					AnimationCurve.OutTangents.Add(OutTangent);
+					CubicValues.Add(Value);
+				}
+
+				AnimationCurve.Values = CubicValues;
+			}
+
+			Samplers.Add(AnimationCurve);
+		}
+
+#if 1 // WITH_DIRECTIVE
+		auto Result = MakeShared<FParsedAnimationCurves>();
+		ParsedAnimationCurvesCache.Add(JsonAnimationObject, Result);
+		Result->Name = Name;
+		Result->Samplers = Samplers;
+		// cache the channels
+		const TArray<TSharedPtr<FJsonValue>>* JsonChannels = nullptr;
+		JsonAnimationObject->TryGetArrayField(TEXT("channels"), JsonChannels);
+		if (JsonChannels)
+		{
+			for (const auto& Value : *JsonChannels)
+			{
+				if (!Value)
+				{
+					continue;
+				}
+
+				const auto JsonChannelObject = Value->AsObject();
+				if (!JsonChannelObject)
+				{
+					continue;
+				}
+
+				FChannelObject ChannelObject;
+				if (!JsonChannelObject->TryGetNumberField("sampler", ChannelObject.Sampler))
+				{
+					continue;
+				}
+
+				const TSharedPtr<FJsonObject>* JsonTargetObject;
+				if (!JsonChannelObject->TryGetObjectField("target", JsonTargetObject))
+				{
+					continue;
+				}
+
+				int64 NodeIndex;
+				if (!(*JsonTargetObject)->TryGetNumberField("node", NodeIndex))
+				{
+					continue;
+				}
+
+				if (!(*JsonTargetObject)->TryGetStringField("path", ChannelObject.TargetPath))
+				{
+					continue;
+				}
+
+				if (!LoadNode(NodeIndex, ChannelObject.TargetNode))
+				{
+					continue;
+				}
+
+				ChannelObject.JsonTargetObject = *JsonTargetObject;
+				Result->JsonChannels.Add(ChannelObject);
+			}			
+		}
+	}
+
+	const auto& Cache = ParsedAnimationCurvesCache[JsonAnimationObject];
+	Name = Cache->Name;
+	const auto& Samplers = Cache->Samplers;
+	if (Cache->JsonChannels.IsEmpty())
 	{
 		return false;
 	}
 
-	Duration = 0.f;
-
-	TArray<FglTFRuntimeAnimationCurve> Samplers;
-
-	for (int32 SamplerIndex = 0; SamplerIndex < JsonSamplers->Num(); SamplerIndex++)
+	for (const auto& ChannelObject : Cache->JsonChannels)
 	{
-		TSharedPtr<FJsonObject> JsonSamplerObject = (*JsonSamplers)[SamplerIndex]->AsObject();
-		if (!JsonSamplerObject)
+		const auto& Sampler = ChannelObject.Sampler;
+		if (Sampler >= Samplers.Num())
 		{
 			return false;
 		}
-
-		FglTFRuntimeAnimationCurve AnimationCurve;
-
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", AnimationCurve.Timeline, { EGLTFComponentType::Float }, INDEX_NONE, false, nullptr))
+#if 0
+		const auto JsonTargetObject = &ChannelObject.JsonTargetObject;
+		FglTFRuntimeNode Node;
+		if (OverrideTrackNameFromExtension.Num() > 0)
 		{
-			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"input\" from sampler %d"), SamplerIndex));
-			return false;
-		}
-
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", AnimationCurve.Values, { 1, 3, 4 }, { EGLTFComponentType::Float, EGLTFComponentType::Int8, EGLTFComponentType::UInt8, EGLTFComponentType::Int16, EGLTFComponentType::UInt16 }, INDEX_NONE, true, nullptr))
-		{
-			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"output\" from sampler %d"), SamplerIndex));
-			return false;
-		}
-
-		FString SamplerInterpolation;
-		if (!JsonSamplerObject->TryGetStringField("interpolation", SamplerInterpolation))
-		{
-			SamplerInterpolation = "LINEAR";
-		}
-
-		// get animation valid duration
-		for (float Time : AnimationCurve.Timeline)
-		{
-			if (Time > Duration)
+			const TSharedPtr<FJsonObject>* JsonTargetExtensions;
+			if ((*JsonTargetObject)->TryGetObjectField("extensions", JsonTargetExtensions))
 			{
-				Duration = Time;
+				TSharedPtr<FJsonValue> JsonTrackName = GetJSONObjectFromRelativePath(JsonTargetExtensions->ToSharedRef(), OverrideTrackNameFromExtension);
+				if (JsonTrackName)
+				{
+					JsonTrackName->TryGetString(Node.Name);
+				}
 			}
 		}
 
-		// extract tangents and value (unfortunately Unreal does not support Cubic Splines for skeletal animations)
-		if (SamplerInterpolation == "CUBICSPLINE")
+		if (Node.Name.IsEmpty())
 		{
-			TArray<FVector4> CubicValues;
-			for (int32 TimeIndex = 0; TimeIndex < AnimationCurve.Timeline.Num(); TimeIndex++)
-			{
-				// gather A, V and B
-				FVector4 InTangent = AnimationCurve.Values[TimeIndex * 3];
-				FVector4 Value = AnimationCurve.Values[TimeIndex * 3 + 1];
-				FVector4 OutTangent = AnimationCurve.Values[TimeIndex * 3 + 2];
-
-				AnimationCurve.InTangents.Add(InTangent);
-				AnimationCurve.OutTangents.Add(OutTangent);
-				CubicValues.Add(Value);
-			}
-
-			AnimationCurve.Values = CubicValues;
+			Node = ChannelObject.TargetNode;
 		}
-
-		Samplers.Add(AnimationCurve);
-	}
-#if 1 // WITH_DIRECTIVE
-		FParsedAnimationCurves Result { Name, Samplers };
-		ParsedAnimationCurvesCache.Add(JsonAnimationObject, Result);
-	}
-	const auto& Cache = ParsedAnimationCurvesCache[JsonAnimationObject];
-	Name = Cache.Name;
-	const auto& Samplers = Cache.Samplers;
+#else
+		ensure(OverrideTrackNameFromExtension.IsEmpty());
+		const auto& Node = ChannelObject.TargetNode;
 #endif
+		if (!NodeFilter(Node))
+		{
+			continue;
+		}
 
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadAnimation_Internal_Callback);
+			Callback(Node, ChannelObject.TargetPath, Samplers[Sampler]);
+		}
 
+#else // WITH_DIRECTIVE
 	const TArray<TSharedPtr<FJsonValue>>* JsonChannels;
 	if (!JsonAnimationObject->TryGetArrayField("channels", JsonChannels))
 	{
 		return false;
 	}
-
 	for (int32 ChannelIndex = 0; ChannelIndex < JsonChannels->Num(); ChannelIndex++)
 	{
 		TSharedPtr<FJsonObject> JsonChannelObject = (*JsonChannels)[ChannelIndex]->AsObject();
 		if (!JsonChannelObject)
 			return false;
 
-		int32 Sampler;
+			int32 Sampler;
 		if (!JsonChannelObject->TryGetNumberField("sampler", Sampler))
 		{
 			return false;
@@ -1441,6 +1538,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 		}
 
 		Callback(Node, Path, Samplers[Sampler]);
+#endif // WITH_DIRECTIVE		
 	}
 
 	return true;

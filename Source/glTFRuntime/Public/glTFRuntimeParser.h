@@ -2297,13 +2297,22 @@ protected:
 	TMap<int32, UTexture2D*> TexturesCache;
 
 #if 1 // WITH_DIRECTIVE
+	struct FChannelObject
+	{
+		int Sampler = INDEX_NONE;
+		TSharedPtr<FJsonObject> JsonTargetObject;
+		FString TargetPath;
+		FglTFRuntimeNode TargetNode;
+	};
+
 	struct FParsedAnimationCurves
 	{
 		FString Name;
 		TArray<FglTFRuntimeAnimationCurve> Samplers;
+		TArray<FChannelObject> JsonChannels;
 	};
 	TMap<int32, TArray<UglTFRuntimeAnimationCurve*>> AnimationCurvesCache;
-	TMap<TSharedPtr<FJsonObject>, FParsedAnimationCurves> ParsedAnimationCurvesCache;
+	TMap<TSharedPtr<FJsonObject>, TSharedPtr<FParsedAnimationCurves>> ParsedAnimationCurvesCache;
 #endif
 
 	TMap<int32, TArray64<uint8>> BuffersCache;
