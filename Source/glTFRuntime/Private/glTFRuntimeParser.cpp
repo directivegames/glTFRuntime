@@ -1278,13 +1278,13 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 
 		FglTFRuntimeAnimationCurve AnimationCurve;
 
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", AnimationCurve.Timeline, { 5126 }, INDEX_NONE, false, nullptr))
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "input", AnimationCurve.Timeline, { EGLTFComponentType::Float }, INDEX_NONE, false, nullptr))
 		{
 			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"input\" from sampler %d"), SamplerIndex));
 			return false;
 		}
 
-		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", AnimationCurve.Values, { 1, 3, 4 }, { 5126, 5120, 5121, 5122, 5123 }, INDEX_NONE, true, nullptr))
+		if (!BuildFromAccessorField(JsonSamplerObject.ToSharedRef(), "output", AnimationCurve.Values, { 1, 3, 4 }, { EGLTFComponentType::Float, EGLTFComponentType::Int8, EGLTFComponentType::UInt8, EGLTFComponentType::Int16, EGLTFComponentType::UInt16 }, INDEX_NONE, true, nullptr))
 		{
 			AddError("LoadAnimation_Internal()", FString::Printf(TEXT("Unable to retrieve \"output\" from sampler %d"), SamplerIndex));
 			return false;
@@ -2153,7 +2153,7 @@ bool FglTFRuntimeParser::FillReferenceSkeleton(TSharedRef<FJsonObject> JsonSkinO
 			return false;
 		}
 
-		if (Elements != 16 || ComponentType != 5126)
+		if (Elements != 16 || ComponentType != (int64)EGLTFComponentType::Float)
 		{
 			return false;
 		}
@@ -2645,17 +2645,17 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 
 	const bool bHasMeshQuantization = ExtensionsRequired.Contains("KHR_mesh_quantization");
 
-	TArray<int64> SupportedPositionComponentTypes = { 5126 };
-	TArray<int64> SupportedNormalComponentTypes = { 5126 };
-	TArray<int64> SupportedTangentComponentTypes = { 5126 };
-	TArray<int64> SupportedTexCoordComponentTypes = { 5126, 5121, 5123 };
+	TArray<EGLTFComponentType> SupportedPositionComponentTypes = { EGLTFComponentType::Float };
+	TArray<EGLTFComponentType> SupportedNormalComponentTypes = { EGLTFComponentType::Float };
+	TArray<EGLTFComponentType> SupportedTangentComponentTypes = { EGLTFComponentType::Float };
+	TArray<EGLTFComponentType> SupportedTexCoordComponentTypes = { EGLTFComponentType::Float, EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 };
 	if (bHasMeshQuantization)
 	{
-		// the bDefaultNormalized is not necessarely a good idea but I do not want to break old (technically invalid) assets
-		SupportedPositionComponentTypes.Append({ 5120, 5121, 5122, 5123 });
-		SupportedNormalComponentTypes.Append({ 5120, 5122 });
-		SupportedTangentComponentTypes.Append({ 5120, 5122 });
-		SupportedTexCoordComponentTypes.Append({ 5120, 5122 });
+		// the bDefaultNormalized is not necessarily a good idea but I do not want to break old (technically invalid) assets
+		SupportedPositionComponentTypes.Append({ EGLTFComponentType::Int8, EGLTFComponentType::UInt8, EGLTFComponentType::Int16, EGLTFComponentType::UInt16 });
+		SupportedNormalComponentTypes.Append({ EGLTFComponentType::Int8, EGLTFComponentType::Int16 });
+		SupportedTangentComponentTypes.Append({ EGLTFComponentType::Int8, EGLTFComponentType::Int16 });
+		SupportedTexCoordComponentTypes.Append({ EGLTFComponentType::Int8, EGLTFComponentType::Int16 });
 	}
 
 	if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "POSITION", Primitive.Positions,
@@ -2696,7 +2696,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			return false;
 		}
 
-		if (TexCoordComponentType == 5126)
+		if (TexCoordComponentType == (int64)EGLTFComponentType::Float)
 		{
 			Primitive.bHighPrecisionUVs = true;
 		}
@@ -2715,7 +2715,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			return false;
 		}
 
-		if (TexCoordComponentType == 5126)
+		if (TexCoordComponentType == (int64)EGLTFComponentType::Float)
 		{
 			Primitive.bHighPrecisionUVs = true;
 		}
@@ -2727,7 +2727,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FglTFRuntimeUInt16Vector4> Joints;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_0", Joints,
-			{ 4 }, { 5121, 5123 }, Primitive.AdditionalBufferView, false, nullptr))
+			{ 4 }, { EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 }, Primitive.AdditionalBufferView, false, nullptr))
 		{
 			AddError("LoadPrimitive()", "Error loading JOINTS_0");
 			return false;
@@ -2740,7 +2740,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FglTFRuntimeUInt16Vector4> Joints;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_1", Joints,
-			{ 4 }, { 5121, 5123 }, Primitive.AdditionalBufferView, false, nullptr))
+			{ 4 }, { EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 }, Primitive.AdditionalBufferView, false, nullptr))
 		{
 			AddError("LoadPrimitive()", "Error loading JOINTS_1");
 			return false;
@@ -2753,7 +2753,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	{
 		TArray<FglTFRuntimeUInt16Vector4> Joints;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "JOINTS_2", Joints,
-			{ 4 }, { 5121, 5123 }, Primitive.AdditionalBufferView, false, nullptr))
+			{ 4 }, { EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 }, Primitive.AdditionalBufferView, false, nullptr))
 		{
 			AddError("LoadPrimitive()", "Error loading JOINTS_2");
 			return false;
@@ -2767,13 +2767,13 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		TArray<FVector4> Weights;
 		int64 WeightsComponentType = 0;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_0", Weights,
-			{ 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true, &WeightsComponentType))
+			{ 4 }, { EGLTFComponentType::Float, EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 }, Primitive.AdditionalBufferView, true, &WeightsComponentType))
 		{
 			AddError("LoadPrimitive()", "Error loading WEIGHTS_0");
 			return false;
 		}
 
-		if (WeightsComponentType == 5126 || WeightsComponentType == 5123)
+		if (WeightsComponentType == (int64)EGLTFComponentType::Float || WeightsComponentType == (int64)EGLTFComponentType::UInt16)
 		{
 			Primitive.bHighPrecisionWeights = true;
 		}
@@ -2786,13 +2786,13 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		TArray<FVector4> Weights;
 		int64 WeightsComponentType = 0;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_1", Weights,
-			{ 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true, &WeightsComponentType))
+			{ 4 }, { EGLTFComponentType::Float, EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 }, Primitive.AdditionalBufferView, true, &WeightsComponentType))
 		{
 			AddError("LoadPrimitive()", "Error loading WEIGHTS_1");
 			return false;
 		}
 
-		if (WeightsComponentType == 5126 || WeightsComponentType == 5123)
+		if (WeightsComponentType == (int64)EGLTFComponentType::Float || WeightsComponentType == (int64)EGLTFComponentType::UInt16)
 		{
 			Primitive.bHighPrecisionWeights = true;
 		}
@@ -2805,13 +2805,13 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 		TArray<FVector4> Weights;
 		int64 WeightsComponentType = 0;
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "WEIGHTS_2", Weights,
-			{ 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true, &WeightsComponentType))
+			{ 4 }, { EGLTFComponentType::Float, EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 }, Primitive.AdditionalBufferView, true, &WeightsComponentType))
 		{
 			AddError("LoadPrimitive()", "Error loading WEIGHTS_2");
 			return false;
 		}
 
-		if (WeightsComponentType == 5126 || WeightsComponentType == 5123)
+		if (WeightsComponentType == (int64)EGLTFComponentType::Float || WeightsComponentType == (int64)EGLTFComponentType::UInt16)
 		{
 			Primitive.bHighPrecisionWeights = true;
 		}
@@ -2822,7 +2822,7 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 	if ((*JsonAttributesObject)->HasField("COLOR_0"))
 	{
 		if (!BuildFromAccessorField(JsonAttributesObject->ToSharedRef(), "COLOR_0", Primitive.Colors,
-			{ 3, 4 }, { 5126, 5121, 5123 }, Primitive.AdditionalBufferView, true, nullptr))
+			{ 3, 4 }, { EGLTFComponentType::Float, EGLTFComponentType::UInt8, EGLTFComponentType::UInt16 }, Primitive.AdditionalBufferView, true, nullptr))
 		{
 			AddError("LoadPrimitive()", "Error loading COLOR_0");
 			return false;
@@ -2913,16 +2913,16 @@ bool FglTFRuntimeParser::LoadPrimitive(TSharedRef<FJsonObject> JsonPrimitiveObje
 			int64 IndexIndex = i * Stride;
 
 			uint32 VertexIndex;
-			if (ComponentType == 5121)
+			if (ComponentType == (int64)EGLTFComponentType::UInt8)
 			{
 				VertexIndex = IndicesBytes.Data[IndexIndex];
 			}
-			else if (ComponentType == 5123)
+			else if (ComponentType == (int64)EGLTFComponentType::UInt16)
 			{
 				uint16* IndexPtr = (uint16*)&(IndicesBytes.Data[IndexIndex]);
 				VertexIndex = *IndexPtr;
 			}
-			else if (ComponentType == 5125)
+			else if (ComponentType == (int64)EGLTFComponentType::UInt32)
 			{
 				uint32* IndexPtr = (uint32*)&(IndicesBytes.Data[IndexIndex]);
 				VertexIndex = *IndexPtr;
@@ -3476,18 +3476,18 @@ bool FglTFRuntimeParser::GetAccessor(const int32 Index, int64& ComponentType, in
 	for (int32 SparseIndexOffset = 0; SparseIndexOffset < SparseCount; SparseIndexOffset++)
 	{
 		// UNSIGNED_BYTE
-		if (SparseComponentType == 5121)
+		if (SparseComponentType == (int64)EGLTFComponentType::UInt8)
 		{
 			SparseIndices.Add(*SparseIndicesBase);
 		}
 		// UNSIGNED_SHORT
-		else if (SparseComponentType == 5123)
+		else if (SparseComponentType == (int64)EGLTFComponentType::UInt16)
 		{
 			uint16* SparseIndicesBaseUint16 = (uint16*)SparseIndicesBase;
 			SparseIndices.Add(*SparseIndicesBaseUint16);
 		}
 		// UNSIGNED_INT
-		else if (SparseComponentType == 5125)
+		else if (SparseComponentType == (int64)EGLTFComponentType::UInt32)
 		{
 			uint32* SparseIndicesBaseUint32 = (uint32*)SparseIndicesBase;
 			SparseIndices.Add(*SparseIndicesBaseUint32);
@@ -3558,17 +3558,17 @@ int64 FglTFRuntimeParser::GetComponentTypeSize(const int64 ComponentType) const
 {
 	switch (ComponentType)
 	{
-	case(5120):
+	case((int64)EGLTFComponentType::Int8):
 		return 1;
-	case(5121):
+	case((int64)EGLTFComponentType::UInt8):
 		return 1;
-	case(5122):
+	case((int64)EGLTFComponentType::Int16):
 		return 2;
-	case(5123):
+	case((int64)EGLTFComponentType::UInt16):
 		return 2;
-	case(5125):
+	case((int64)EGLTFComponentType::UInt32):
 		return 4;
-	case(5126):
+	case((int64)EGLTFComponentType::Float):
 		return 4;
 	default:
 		break;

@@ -117,6 +117,22 @@ enum class EglTFRuntimeRecursiveMode : uint8
 	Tree
 };
 
+
+#if 1 // WITH_DIRECTIVE
+enum class EGLTFComponentType
+{
+	None = -1,
+	Int8 = 5120,
+	UInt8 = 5121,
+	Int16 = 5122,
+	UInt16 = 5123,
+	Int32 = 5124, // unused
+	UInt32 = 5125,
+	Float = 5126
+};
+#endif
+
+
 USTRUCT(BlueprintType)
 struct FglTFRuntimeBasisMatrix
 {
@@ -2407,7 +2423,7 @@ public:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<EGLTFComponentType>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
 #if 1 // WITH_DIRECTIVE
 		TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildFromAccessorField);
@@ -2432,7 +2448,7 @@ public:
 			return false;
 		}
 
-		if (!SupportedTypes.Contains(ComponentType))
+		if (!SupportedTypes.Contains((EGLTFComponentType)ComponentType))
 		{
 			return false;
 		}
@@ -2448,7 +2464,7 @@ public:
 			int64 Index = ElementIndex * Stride;
 			T Value;
 			// FLOAT
-			if (ComponentType == 5126)
+			if (ComponentType == (int64)EGLTFComponentType::Float)
 			{
 				float* Ptr = (float*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
@@ -2457,7 +2473,7 @@ public:
 				}
 			}
 			// BYTE
-			else if (ComponentType == 5120)
+			else if (ComponentType == (int64)EGLTFComponentType::Int8)
 			{
 				int8* Ptr = (int8*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
@@ -2467,7 +2483,7 @@ public:
 
 			}
 			// UNSIGNED_BYTE
-			else if (ComponentType == 5121)
+			else if (ComponentType == (int64)EGLTFComponentType::UInt8)
 			{
 				uint8* Ptr = (uint8*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
@@ -2476,7 +2492,7 @@ public:
 				}
 			}
 			// SHORT
-			else if (ComponentType == 5122)
+			else if (ComponentType == (int64)EGLTFComponentType::Int16)
 			{
 				int16* Ptr = (int16*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
@@ -2485,7 +2501,7 @@ public:
 				}
 			}
 			// UNSIGNED_SHORT
-			else if (ComponentType == 5123)
+			else if (ComponentType == (int64)EGLTFComponentType::UInt16)
 			{
 				uint16* Ptr = (uint16*)&(Blob.Data[Index]);
 				for (int32 i = 0; i < Elements; i++)
@@ -2506,7 +2522,7 @@ public:
 	}
 
 	template<typename T, typename Callback>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<EGLTFComponentType>& SupportedTypes, Callback Filter, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
 		int64 AccessorIndex;
 		if (!JsonObject->TryGetNumberField(Name, AccessorIndex))
@@ -2528,7 +2544,7 @@ public:
 			return false;
 		}
 
-		if (!SupportedTypes.Contains(ComponentType))
+		if (!SupportedTypes.Contains((EGLTFComponentType)ComponentType))
 		{
 			return false;
 		}
@@ -2544,31 +2560,31 @@ public:
 			int64 Index = ElementIndex * Stride;
 			T Value;
 			// FLOAT
-			if (ComponentType == 5126)
+			if (ComponentType == (int64)EGLTFComponentType::Float)
 			{
 				float* Ptr = (float*)&(Blob.Data[Index]);
 				Value = *Ptr;
 			}
 			// BYTE
-			else if (ComponentType == 5120)
+			else if (ComponentType == (int64)EGLTFComponentType::Int8)
 			{
 				int8* Ptr = (int8*)&(Blob.Data[Index]);
 				Value = bNormalized ? FMath::Max(((float)(*Ptr)) / 127.f, -1.f) : *Ptr;
 			}
 			// UNSIGNED_BYTE
-			else if (ComponentType == 5121)
+			else if (ComponentType == (int64)EGLTFComponentType::UInt8)
 			{
 				uint8* Ptr = (uint8*)&(Blob.Data[Index]);
 				Value = bNormalized ? ((float)(*Ptr)) / 255.f : *Ptr;
 			}
 			// SHORT
-			else if (ComponentType == 5122)
+			else if (ComponentType == (int64)EGLTFComponentType::Int16)
 			{
 				int16* Ptr = (int16*)&(Blob.Data[Index]);
 				Value = bNormalized ? FMath::Max(((float)(*Ptr)) / 32767.f, -1.f) : *Ptr;
 			}
 			// UNSIGNED_SHORT
-			else if (ComponentType == 5123)
+			else if (ComponentType == (int64)EGLTFComponentType::UInt16)
 			{
 				uint16* Ptr = (uint16*)&(Blob.Data[Index]);
 				Value = bNormalized ? ((float)(*Ptr)) / 65535.f : *Ptr;
@@ -2586,13 +2602,13 @@ public:
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedElements, const TArray<EGLTFComponentType>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
 		return BuildFromAccessorField(JsonObject, Name, Data, SupportedElements, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized, ComponentTypePtr);
 	}
 
 	template<typename T>
-	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<int64>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
+	bool BuildFromAccessorField(TSharedRef<FJsonObject> JsonObject, const FString& Name, TArray<T>& Data, const TArray<EGLTFComponentType>& SupportedTypes, const int64 AdditionalBufferView, const bool bDefaultNormalized, int64* ComponentTypePtr)
 	{
 		return BuildFromAccessorField(JsonObject, Name, Data, SupportedTypes, [&](T InValue) -> T {return InValue; }, AdditionalBufferView, bDefaultNormalized, ComponentTypePtr);
 	}
