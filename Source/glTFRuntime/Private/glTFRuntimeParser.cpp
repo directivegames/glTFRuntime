@@ -717,6 +717,41 @@ bool FglTFRuntimeParser::LoadScenes(TArray<FglTFRuntimeScene>& Scenes)
 	return true;
 }
 
+#if 1 // WITH_DIRECTIVE
+const TArray<TSharedPtr<FJsonValue>>* FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index)
+{
+	if (Index < 0)
+	{
+		return nullptr;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonArray = nullptr;
+	JsonObject->TryGetArrayField(FieldName, JsonArray);
+	if (!JsonArray)
+	{
+		return nullptr;
+	}
+
+	if (Index >= JsonArray->Num())
+	{
+		return nullptr;
+	}
+
+	return JsonArray;
+}
+
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index)
+{
+	if (auto JsonArray = CheckJsonIndex(JsonObject, FieldName, Index))
+	{
+		return (*JsonArray)[Index]->AsObject();
+	}
+
+	return nullptr;
+}
+
+#else // WITH_DIRECTIVE
+
 bool FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index, TArray<TSharedRef<FJsonValue>>& JsonItems)
 {
 	if (Index < 0)
@@ -753,6 +788,7 @@ TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJ
 
 	return JsonArray[Index]->AsObject();
 }
+#endif
 
 TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromExtensionIndex(TSharedRef<FJsonObject> JsonObject, const FString& ExtensionName, const FString& FieldName, const int32 Index)
 {
