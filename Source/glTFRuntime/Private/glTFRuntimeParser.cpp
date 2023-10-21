@@ -1522,14 +1522,9 @@ UglTFRuntimeAnimationCurve* FglTFRuntimeParser::LoadNodeAnimationCurve(const int
 	return nullptr;
 }
 
+#if 0
 TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurves(const int32 NodeIndex)
 {
-#if 1 // WITH_DIRECTIVE
-	if (auto Record = AnimationCurvesCache.Find(NodeIndex))
-	{
-		return *Record;
-	}
-#endif
 	TArray<UglTFRuntimeAnimationCurve*> AnimationCurves;
 
 	FglTFRuntimeNode Node;
@@ -1619,12 +1614,9 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		}
 	}
 
-#if 1 // WITH_DIRECTIVE
-	AnimationCurvesCache.Add(NodeIndex, AnimationCurves);
-#endif
-
 	return AnimationCurves;
 }
+#endif
 
 bool FglTFRuntimeParser::HasRoot(int32 Index, int32 RootIndex)
 {

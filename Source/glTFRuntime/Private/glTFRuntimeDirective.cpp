@@ -213,11 +213,118 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			continue;
 		}
 
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadAnimation_Internal_Callback);
-			Callback(Node, ChannelObject.TargetPath, Samplers[Sampler]);
-		}
+		Callback(Node, ChannelObject.TargetPath, Samplers[Sampler]);
 	}
 
 	return true;
+}
+
+TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurves(const int32 NodeIndex)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadAllNodeAnimationCurves);
+
+	if (auto Record = AnimationCurvesCache.Find(NodeIndex))
+	{
+		return *Record;
+	}
+
+	FglTFRuntimeNode Node;
+	if (!LoadNode(NodeIndex, Node))
+	{
+		return {};
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* JsonAnimations;
+	if (!Root->TryGetArrayField(TEXT("animations"), JsonAnimations))
+	{
+		return {};
+	}
+
+	UglTFRuntimeAnimationCurve* AnimationCurve = nullptr;
+
+	FTransform OriginalTransform = FTransform(SceneBasis * Node.Transform.ToMatrixWithScale() * SceneBasis.Inverse());
+
+	bool bAnimationFound = false;
+
+	auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNodeAnimation_Callback);
+
+			if (Path == TEXT("translation"))
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNodeAnimation_AddTranslation);
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError(TEXT("LoadAllNodeAnimationCurves()"), FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					AnimationCurve->AddLocationValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex] * SceneScale, ERichCurveInterpMode::RCIM_Linear);
+				}
+			}
+			else if (Path == TEXT("rotation"))
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNodeAnimation_AddRotation);
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError(TEXT("LoadAllNodeAnimationCurves()"), FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					FVector4 RotationValue = Curve.Values[TimeIndex];
+					FQuat Quat(RotationValue.X, RotationValue.Y, RotationValue.Z, RotationValue.W);
+					FVector Euler = Quat.Euler();
+					AnimationCurve->AddRotationValue(Curve.Timeline[TimeIndex], Euler, ERichCurveInterpMode::RCIM_Linear);
+				}
+			}
+			else if (Path == TEXT("scale"))
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNodeAnimation_AddScale);
+				if (Curve.Timeline.Num() != Curve.Values.Num())
+				{
+					AddError(TEXT("LoadAllNodeAnimationCurves()"), FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
+					return;
+				}
+				for (int32 TimeIndex = 0; TimeIndex < Curve.Timeline.Num(); TimeIndex++)
+				{
+					AnimationCurve->AddScaleValue(Curve.Timeline[TimeIndex], Curve.Values[TimeIndex], ERichCurveInterpMode::RCIM_Linear);
+				}
+			}
+			bAnimationFound = true;
+		};
+
+	TArray<UglTFRuntimeAnimationCurve*> AnimationCurves;
+
+	for (int32 JsonAnimationIndex = 0; JsonAnimationIndex < JsonAnimations->Num(); JsonAnimationIndex++)
+	{
+		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
+		if (!JsonAnimationObject)
+			continue;
+
+		float Duration;
+		FString Name;
+		bAnimationFound = false;
+		AnimationCurve = NewObject<UglTFRuntimeAnimationCurve>(GetTransientPackage(), NAME_None, RF_Public);
+		AnimationCurve->SetDefaultValues(OriginalTransform.GetLocation(), OriginalTransform.Rotator().Euler(), OriginalTransform.GetScale3D());
+		if (!LoadAnimation_Internal(JsonAnimationObject.ToSharedRef(), Duration, Name, Callback, [&](const FglTFRuntimeNode& Node) -> bool { return Node.Index == NodeIndex; }, {}))
+		{
+			continue;
+		}
+
+		// stop at the first found animation
+		if (bAnimationFound)
+		{
+			AnimationCurve->glTFCurveAnimationIndex = JsonAnimationIndex;
+			AnimationCurve->glTFCurveAnimationName = Name;
+			AnimationCurve->glTFCurveAnimationDuration = Duration;
+			AnimationCurve->BasisMatrix = SceneBasis;
+			AnimationCurves.Add(AnimationCurve);
+		}
+	}
+
+	AnimationCurvesCache.Add(NodeIndex, AnimationCurves);
+
+	return AnimationCurves;
 }
