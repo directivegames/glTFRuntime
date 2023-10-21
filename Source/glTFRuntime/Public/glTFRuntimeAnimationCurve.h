@@ -6,6 +6,14 @@
 #include "Curves/CurveBase.h"
 #include "glTFRuntimeAnimationCurve.generated.h"
 
+#if 1 // WITH_DIRECTIVE
+struct FglTFRuntimeCurvePoint
+{
+	float Time = 0.f;
+	FVector Value = FVector::ZeroVector;
+};
+#endif
+
 /**
  * 
  */
@@ -54,4 +62,10 @@ public:
     void AddRotationValue(const float InTime, const FVector InEulerRotation, const ERichCurveInterpMode InterpolationMode);
     void AddScaleValue(const float InTime, const FVector InScale, const ERichCurveInterpMode InterpolationMode);
     void SetDefaultValues(const FVector Location, const FVector EulerRotation, const FVector Scale);
+
+#if 1 // WITH_DIRECTIVE
+	void AddLocationValues(const TArray<FglTFRuntimeCurvePoint>& Points, ERichCurveInterpMode InterpolationMode);
+	void AddRotationValues(const TArray<FglTFRuntimeCurvePoint>& Points, ERichCurveInterpMode InterpolationMode);
+	void AddScaleValues(const TArray<FglTFRuntimeCurvePoint>& Points, ERichCurveInterpMode InterpolationMode);
+#endif
 };
