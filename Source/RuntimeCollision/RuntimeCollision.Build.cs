@@ -6,6 +6,8 @@ public class RuntimeCollision : ModuleRules
 {
     public RuntimeCollision(ReadOnlyTargetRules Target) : base(Target)
     {
+        // OptimizeCode = CodeOptimization.Never;
+
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
         bUseUnity = false;
 

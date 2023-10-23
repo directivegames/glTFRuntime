@@ -6,6 +6,8 @@ public class glTFRuntimeEditor : ModuleRules
 {
     public glTFRuntimeEditor(ReadOnlyTargetRules Target) : base(Target)
     {
+        // OptimizeCode = CodeOptimization.Never;
+
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
         bUseUnity = false;
 
