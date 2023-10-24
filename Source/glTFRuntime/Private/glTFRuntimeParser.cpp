@@ -3613,6 +3613,11 @@ void FglTFRuntimeParser::ClearCache()
 	SpecularGlossinessMaterialsMap.Empty();
 	UnlitMaterialsMap.Empty();
 	TransmissionMaterialsMap.Empty();
+
+#if 1 // WITH_DIRECTIVE
+	ClearCoatMaterialsMap.Empty();
+	MaterialsNameCache.Empty();
+#endif
 }
 
 float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)
