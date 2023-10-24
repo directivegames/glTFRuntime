@@ -3592,6 +3592,9 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(TransmissionMaterialsMap);
 
 #if 1 // WITH_DIRECTIVE
+	Collector.AddReferencedObjects(ClearCoatMaterialsMap);
+	Collector.AddReferencedObjects(MaterialsNameCache);
+
 	for (auto& Itr : AnimationCurvesCache)
 	{
 		Collector.AddReferencedObjects(Itr.Value);
