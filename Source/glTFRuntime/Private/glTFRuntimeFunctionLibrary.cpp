@@ -10,12 +10,22 @@
 #include "Runtime/Launch/Resources/Version.h"
 
 #if 1 // WITH_DIRECTIVE
+#include "Misc/Paths.h"
 #include "glTFRuntimeAssetActor.h"
+#include "Directive/glTFCacheSubsystem.h"
 #endif
 
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(UObject* WorldContextObject, const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	const auto CacheKey = bPathRelativeToContent ? FPaths::Combine(FPaths::ProjectContentDir(), Filename) : Filename;
+	if (auto CachedAsset = UglTFCacheSubsystem::GetCachedAsset(WorldContextObject, CacheKey))
+	{
+		return CachedAsset;
+	}
+#endif
+
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 	{
@@ -38,11 +48,30 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(const 
 		return nullptr;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	if (Asset)
+	{
+		UglTFCacheSubsystem::CacheAsset(WorldContextObject, CacheKey, Asset);
+	}
+#endif
+
 	return Asset;
 }
 
-void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(UObject* WorldContextObject, const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
 {
+#if 1 // WITH_DIRECTIVE
+	const auto CacheKey = bPathRelativeToContent ? FPaths::Combine(FPaths::ProjectContentDir(), Filename) : Filename;
+	if (auto CachedAsset = UglTFCacheSubsystem::GetCachedAsset(WorldContextObject, CacheKey))
+	{
+		AsyncTask(ENamedThreads::GameThread, [Completed, WeakCache = TWeakObjectPtr<UglTFRuntimeAsset>(CachedAsset)]()
+		{
+			Completed.ExecuteIfBound(WeakCache.Get());
+		});		
+		return;
+	}
+#endif
+
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 	{
@@ -61,15 +90,22 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& 
 		OverrideConfig.bSearchContentDir = true;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	Async(EAsyncExecution::Thread, [Filename, Asset, Completed, OverrideConfig, CacheKey, WeakContext = TWeakObjectPtr<UObject>(WorldContextObject)]()
+#else
 	Async(EAsyncExecution::Thread, [Filename, Asset, Completed, OverrideConfig]()
+#endif
 		{
 			TSharedPtr<FglTFRuntimeParser> Parser = FglTFRuntimeParser::FromFilename(Filename, OverrideConfig);
 
 
-			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed]()
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([Parser, Asset, Completed, WeakContext, Filename, CacheKey]()
 				{
 					if (Parser.IsValid() && Asset->SetParser(Parser.ToSharedRef()))
 					{
+#if 1 // WITH_DIRECTIVE
+						UglTFCacheSubsystem::CacheAsset(WeakContext.Get(), CacheKey, Asset);
+#endif
 						Completed.ExecuteIfBound(Asset);
 					}
 					else
@@ -81,8 +117,16 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(const FString& 
 		});
 }
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(UObject* WorldContextObject, const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	const auto CacheKey = UglTFCacheSubsystem::GetKeyHash(JsonData);
+	if (auto CachedAsset = UglTFCacheSubsystem::GetCachedAsset(WorldContextObject, CacheKey))
+	{
+		return CachedAsset;
+	}
+#endif
+
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 	{
@@ -97,11 +141,29 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(const FS
 		return nullptr;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	if (Asset)
+	{
+		UglTFCacheSubsystem::CacheAsset(WorldContextObject, CacheKey, Asset);
+	}
+#endif
+
 	return Asset;
 }
 
-void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(UObject* WorldContextObject, const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	if (auto CachedAsset = UglTFCacheSubsystem::GetCachedAsset(WorldContextObject, Url))
+	{
+		AsyncTask(ENamedThreads::GameThread, [Completed, WeakCache = TWeakObjectPtr<UglTFRuntimeAsset>(CachedAsset)]()
+		{
+			Completed.ExecuteIfBound(WeakCache.Get());
+		});
+		return;
+	}
+#endif
+
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 #else
@@ -119,17 +181,29 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 	}
 
 	float StartTime = FPlatformTime::Seconds();
-
+#if 1 // WITH_DIRECTIVE
+	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime, Url, WeakContext = TWeakObjectPtr<UObject>(WorldContextObject)](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+#else
 	HttpRequest->OnProcessRequestComplete().BindLambda([StartTime](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+#endif
 		{
 			UglTFRuntimeAsset* Asset = nullptr;
 			if (bSuccess)
 			{
+#if 1 // WITH_DIRECTIVE
+				Asset = glTFLoadAssetFromData(WeakContext.Get(), ResponsePtr->GetContent(), LoaderConfig);
+				if (Asset)
+				{
+					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
+					UglTFCacheSubsystem::CacheAsset(WeakContext.Get(), Url, Asset);
+				}
+#else
 				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
 				if (Asset)
 				{
 					Asset->GetParser()->SetDownloadTime(FPlatformTime::Seconds() - StartTime);
 				}
+#endif				
 			}
 			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
@@ -137,8 +211,19 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrl(const FString& Url, const
 	HttpRequest->ProcessRequest();
 }
 
-void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(UObject* WorldContextObject, const FString& Url, const TMap<FString, FString>& Headers, FglTFRuntimeHttpResponse Completed, FglTFRuntimeHttpProgress Progress, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	if (auto CachedAsset = UglTFCacheSubsystem::GetCachedAsset(WorldContextObject, Url))
+	{
+		AsyncTask(ENamedThreads::GameThread, [Completed, WeakCache = TWeakObjectPtr<UglTFRuntimeAsset>(CachedAsset)]()
+		{
+			Completed.ExecuteIfBound(WeakCache.Get());
+		});
+		return;
+	}
+#endif
+
 #if ENGINE_MAJOR_VERSION > 4 || ENGINE_MINOR_VERSION > 25
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 #else
@@ -150,12 +235,24 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString
 		HttpRequest->AppendToHeader(Header.Key, Header.Value);
 	}
 
+#if 1 // WITH_DIRECTIVE
+	HttpRequest->OnProcessRequestComplete().BindLambda([Url, WeakContext = TWeakObjectPtr<UObject>(WorldContextObject)](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+#else
 	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr RequestPtr, FHttpResponsePtr ResponsePtr, bool bSuccess, FglTFRuntimeHttpResponse Completed, const FglTFRuntimeConfig& LoaderConfig)
+#endif
 		{
 			UglTFRuntimeAsset* Asset = nullptr;
 			if (bSuccess)
 			{
+#if 1 // WITH_DIRECTIVE
+				Asset = glTFLoadAssetFromData(WeakContext.Get(), ResponsePtr->GetContent(), LoaderConfig);
+				if (Asset)
+				{
+					UglTFCacheSubsystem::CacheAsset(WeakContext.Get(), Url, Asset);
+				}
+#else
 				Asset = glTFLoadAssetFromData(ResponsePtr->GetContent(), LoaderConfig);
+#endif
 			}
 			Completed.ExecuteIfBound(Asset);
 		}, Completed, LoaderConfig);
@@ -173,8 +270,16 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromUrlWithProgress(const FString
 	HttpRequest->ProcessRequest();
 }
 
-UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig)
+UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(UObject* WorldContextObject, const TArray<uint8>& Data, const FglTFRuntimeConfig& LoaderConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	const auto CacheKey = UglTFCacheSubsystem::GetKeyHash(Data);
+	if (auto CachedAsset = UglTFCacheSubsystem::GetCachedAsset(WorldContextObject, CacheKey))
+	{
+		return CachedAsset;
+	}
+#endif
+
 	UglTFRuntimeAsset* Asset = NewObject<UglTFRuntimeAsset>();
 	if (!Asset)
 	{
@@ -189,10 +294,17 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromData(const TArr
 		return nullptr;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	if (Asset)
+	{
+		UglTFCacheSubsystem::CacheAsset(WorldContextObject, CacheKey, Asset);
+	}
+#endif
+
 	return Asset;
 }
 
-bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpResponse Completed, FString& ClipboardContent, const FglTFRuntimeConfig& LoaderConfig)
+bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(UObject* WorldContextObject, FglTFRuntimeHttpResponse Completed, FString& ClipboardContent, const FglTFRuntimeConfig& LoaderConfig)
 {
 
 	FString Url;
@@ -211,6 +323,15 @@ bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 
 	ClipboardContent = Url;
 
+#if 1 // WITH_DIRECTIVE
+	if (Url.Contains("://"))
+	{
+		glTFLoadAssetFromUrl(WorldContextObject, Url, {}, Completed, LoaderConfig);
+		return true;
+	}
+
+	UglTFRuntimeAsset* Asset = glTFLoadAssetFromFilename(WorldContextObject, Url, false, LoaderConfig);
+#else
 	if (Url.Contains("://"))
 	{
 		glTFLoadAssetFromUrl(Url, {}, Completed, LoaderConfig);
@@ -218,6 +339,7 @@ bool UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(FglTFRuntimeHttpRes
 	}
 
 	UglTFRuntimeAsset* Asset = glTFLoadAssetFromFilename(Url, false, LoaderConfig);
+#endif
 	Completed.ExecuteIfBound(Asset);
 
 	return Asset != nullptr;

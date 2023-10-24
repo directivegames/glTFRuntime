@@ -38,7 +38,11 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActor()
 		{
 			FglTFRuntimeConfig LoaderConfig;
 			LoaderConfig.bAllowExternalFiles = true;
+#if 1 // WITH_DIRECTIVE
+			UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(nullptr, OutFilenames[0], false, LoaderConfig);
+#else
 			UglTFRuntimeAsset* Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(OutFilenames[0], false, LoaderConfig);
+#endif
 			if (Asset)
 			{
 				FTransform Transform = FTransform(GEditor->ClickLocation);
@@ -71,7 +75,11 @@ void FglTFRuntimeEditorModule::SpawnglTFRuntimeActorFromClipboard()
 
 	FString ClipboardContent;
 
+#if 1 // WITH_DIRECTIVE
+	if (!UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(nullptr, HttpResponse, ClipboardContent, LoaderConfig))
+#else
 	if (!UglTFRuntimeFunctionLibrary::glTFLoadAssetFromClipboard(HttpResponse, ClipboardContent, LoaderConfig))
+#endif
 	{
 		UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to load asset from clipboard"));
 	}

@@ -70,7 +70,11 @@ UObject* UGLTFFactory::FactoryCreateFile(UClass* InClass, UObject* InParent, FNa
 	UObject* Loaded = nullptr;
 	FglTFRuntimeConfig Config;
 	const auto ParentName = InParent->GetName();
+#if 1 // WITH_DIRECTIVE
+	if (auto Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(nullptr, Filename, false, Config))
+#else
 	if (auto Asset = UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(Filename, false, Config))
+#endif
 	{
 		const auto Nodes = Asset->GetNodes();
 		TArray<UObject*> SavedObjects;
