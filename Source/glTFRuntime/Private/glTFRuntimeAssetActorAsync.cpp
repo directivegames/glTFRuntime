@@ -85,7 +85,13 @@ void AglTFRuntimeAssetActorAsync::ProcessNode(USceneComponent* NodeParentCompone
 			UStaticMeshComponent* StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
 			StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			StaticMeshComponent->RegisterComponent();
+#if 1 // WITH_DIRECTIVE
+			auto NodeTransform = Node.Transform;
+			NodeTransform.SetScale3D(NodeTransform.GetScale3D() / StaticMeshConfig.DefaultMeshScale);
+			StaticMeshComponent->SetRelativeTransform(NodeTransform);
+#else
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
+#endif
 			AddInstanceComponent(StaticMeshComponent);
 			MeshesToLoad.Add(StaticMeshComponent, Node);
 			NewComponent = StaticMeshComponent;

@@ -233,13 +233,16 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			{
 				StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			}
-			StaticMeshComponent->RegisterComponent();
-			StaticMeshComponent->SetRelativeTransform(Node.Transform);
+			StaticMeshComponent->RegisterComponent();			
 
 #if 1 // WITH_DIRECTIVE
+			auto NodeTransform = Node.Transform;
+			NodeTransform.SetScale3D(NodeTransform.GetScale3D() / StaticMeshConfig.DefaultMeshScale);
+			StaticMeshComponent->SetRelativeTransform(NodeTransform);
 			CustomAddInstanceComponent(StaticMeshComponent);
 			FglTFRuntimeParser::AddStaticMeshComponentReference(StaticMeshComponent);
-#else			
+#else
+			StaticMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(StaticMeshComponent);
 #endif
 

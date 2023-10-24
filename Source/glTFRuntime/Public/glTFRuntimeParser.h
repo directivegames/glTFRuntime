@@ -679,6 +679,9 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	bool bCreateAsDefaultSubObject = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	float DefaultMeshScale = 1.f;
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
