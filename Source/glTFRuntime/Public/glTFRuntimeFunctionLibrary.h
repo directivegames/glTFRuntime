@@ -49,7 +49,7 @@ public:
 	* If the actor is null, a new 'glTFRuntimeAssetActor' will be created.
 	*/
 	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "glTF Spawn Asset On Actor"), Category = "glTFRuntime")
-	static bool glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+	static AActor* glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
 									  const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
 #endif
 };

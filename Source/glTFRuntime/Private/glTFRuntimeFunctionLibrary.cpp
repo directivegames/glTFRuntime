@@ -381,7 +381,7 @@ TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArr
 }
 
 #if 1 // WITH_DIRECTIVE
-bool UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
 														const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
 {
 	if (ensure(WorldContextObject && Asset))
@@ -417,9 +417,9 @@ bool UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldCont
 				TempActor->SetLifeSpan(0.1f);
 			}
 
-			return true;
+			return Actor;
 		}
 	}
-	return false;
+	return nullptr;
 }
 #endif
