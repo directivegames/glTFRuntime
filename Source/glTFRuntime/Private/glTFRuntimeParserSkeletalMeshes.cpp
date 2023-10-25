@@ -1844,11 +1844,20 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 		bool bAnimationFound = false;
 		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
 			{
+#if 1 // WITH_DIRECTIVE
+				if ((Node.Index == NodeIndex) || Joints.Contains(Node.Index))
+				{
+					bAnimationFound = true;
+					return true;
+				}
+				return false;
+#else
 				if (!bAnimationFound)
 				{
 					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
 				}
 				return true;
+#endif
 			}))
 		{
 			return nullptr;
