@@ -2761,6 +2761,10 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 
 FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const float T1, const FVector4 Value0, const FVector4 OutTangent, const FVector4 Value1, const FVector4 InTangent)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(CubicSpline);
+#endif
+
 	float TD = T1 - T0;
 	float T = (TC - T0) / TD;
 	float TT = T * T;
@@ -2918,6 +2922,8 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #if 1 // WITH_DIRECTIVE
 				const auto TransformPose = SkeletalAnimationConfig.TransformPose.Find(TrackName);
 				const auto bRemapperBound = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound();
+				const auto SceneBasisInverse = SceneBasis.Inverse();
+				Track.RotKeys.Reserve(NumFrames);
 #endif
 
 				for (int32 Frame = 0; Frame < NumFrames; Frame++)
@@ -2931,36 +2937,41 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
 #endif
-					FVector4 FirstQuatV = Curve.Values[FirstIndex];
-					FVector4 SecondQuatV = Curve.Values[SecondIndex];
-					FQuat FirstQuat = FQuat(FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W).GetNormalized();
-					FQuat SecondQuat = FQuat(SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W).GetNormalized();
-
-					// cubic spline ?
-					if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
 					{
-						FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], FirstQuatV, Curve.OutTangents[FirstIndex], SecondQuatV, Curve.InTangents[SecondIndex]);
+#if 1 // WITH_DIRECTIVE
+						TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_AnimQuat);
+#endif
+						FVector4 FirstQuatV = Curve.Values[FirstIndex];
+						FVector4 SecondQuatV = Curve.Values[SecondIndex];
+						FQuat FirstQuat = FQuat(FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W).GetNormalized();
+						FQuat SecondQuat = FQuat(SecondQuatV.X, SecondQuatV.Y, SecondQuatV.Z, SecondQuatV.W).GetNormalized();
 
-						AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
+						// cubic spline ?
+						if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+						{
+							FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], FirstQuatV, Curve.OutTangents[FirstIndex], SecondQuatV, Curve.InTangents[SecondIndex]);
 
-						FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
+							AnimQuat = { CubicValue.X, CubicValue.Y, CubicValue.Z, CubicValue.W };
 
-						AnimQuat = RotationMatrix.ToQuat();
-					}
-					else if (FirstIndex == SecondIndex)
-					{
-						FMatrix RotationMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+							FMatrix RotationMatrix = SceneBasisInverse * FQuatRotationMatrix(AnimQuat.GetNormalized()) * SceneBasis;
 
-						AnimQuat = RotationMatrix.ToQuat();
-					}
-					else
-					{
+							AnimQuat = RotationMatrix.ToQuat();
+						}
+						else if (FirstIndex == SecondIndex)
+						{
+							FMatrix RotationMatrix = SceneBasisInverse * FQuatRotationMatrix(FirstQuat) * SceneBasis;
 
-						FMatrix FirstMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(FirstQuat) * SceneBasis;
-						FMatrix SecondMatrix = SceneBasis.Inverse() * FQuatRotationMatrix(SecondQuat) * SceneBasis;
-						FirstQuat = FirstMatrix.ToQuat();
-						SecondQuat = SecondMatrix.ToQuat();
-						AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+							AnimQuat = RotationMatrix.ToQuat();
+						}
+						else
+						{
+
+							FMatrix FirstMatrix = SceneBasisInverse * FQuatRotationMatrix(FirstQuat) * SceneBasis;
+							FMatrix SecondMatrix = SceneBasisInverse * FQuatRotationMatrix(SecondQuat) * SceneBasis;
+							FirstQuat = FirstMatrix.ToQuat();
+							SecondQuat = SecondMatrix.ToQuat();
+							AnimQuat = FQuat::Slerp(FirstQuat, SecondQuat, Alpha);
+						}
 					}
 
 					if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
@@ -3047,6 +3058,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #if 1 // WITH_DIRECTIVE
 				const auto TransformPose = SkeletalAnimationConfig.TransformPose.Find(TrackName);
 				const auto bRemapperBound = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound();
+				Track.PosKeys.Reserve(NumFrames);
 #endif
 				for (int32 Frame = 0; Frame < NumFrames; Frame++)
 				{
@@ -3059,19 +3071,24 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #else
 					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
 #endif
-					FVector4 First = Curve.Values[FirstIndex];
-					FVector4 Second = Curve.Values[SecondIndex];
-
-					// cubic spline ?
-					if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
 					{
-						FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], First, Curve.OutTangents[FirstIndex], Second, Curve.InTangents[SecondIndex]);
+#if 1 // WITH_DIRECTIVE
+						TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_AnimLocation);
+#endif
+						FVector4 First = Curve.Values[FirstIndex];
+						FVector4 Second = Curve.Values[SecondIndex];
 
-						AnimLocation = SceneBasis.TransformPosition(CubicValue) * SceneScale;
-					}
-					else
-					{
-						AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+						// cubic spline ?
+						if (FirstIndex != SecondIndex && Curve.Values.Num() == Curve.InTangents.Num() && Curve.InTangents.Num() == Curve.OutTangents.Num())
+						{
+							FVector4 CubicValue = CubicSpline(FrameBase, Curve.Timeline[FirstIndex], Curve.Timeline[SecondIndex], First, Curve.OutTangents[FirstIndex], Second, Curve.InTangents[SecondIndex]);
+
+							AnimLocation = SceneBasis.TransformPosition(CubicValue) * SceneScale;
+						}
+						else
+						{
+							AnimLocation = SceneBasis.TransformPosition(FMath::Lerp(First, Second, Alpha)) * SceneScale;
+						}
 					}
 
 					if (SkeletalAnimationConfig.RetargetTo || SkeletalAnimationConfig.RetargetToSkeletalMesh)
@@ -3160,6 +3177,10 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 				}
 
 				FRawAnimSequenceTrack& Track = Tracks[TrackName];
+
+#if 1 // WITH_DIRECTIVE
+				Track.ScaleKeys.Reserve(NumFrames);
+#endif
 
 				for (int32 Frame = 0; Frame < NumFrames; Frame++)
 				{
