@@ -110,7 +110,11 @@ public:
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
+#if 1 // WITH_DIRECTIVE
+	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex, const TArray<FString>& WhitelistedAnimationNames);
+#else
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
+#endif
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "glTFRuntime")
 	TArray<FString> GetCamerasNames();

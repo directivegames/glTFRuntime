@@ -224,7 +224,7 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 	return true;
 }
 
-TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurves(const int32 NodeIndex)
+TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurves(const int32 NodeIndex, const TArray<FString>& WhitelistedAnimationNames)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadAllNodeAnimationCurves);
 
@@ -253,6 +253,18 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		TSharedPtr<FJsonObject> JsonAnimationObject = (*JsonAnimations)[JsonAnimationIndex]->AsObject();
 		if (!JsonAnimationObject)
 			continue;
+
+		if (WhitelistedAnimationNames.Num())
+		{
+			FString AnimationName;
+			if (JsonAnimationObject->TryGetStringField(TEXT("name"), AnimationName))
+			{
+				if (!WhitelistedAnimationNames.Contains(AnimationName))
+				{
+					continue;
+				}
+			}
+		}
 
 		float Duration;
 		FString Name;

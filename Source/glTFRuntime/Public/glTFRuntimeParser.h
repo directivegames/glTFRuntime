@@ -682,6 +682,10 @@ struct FglTFRuntimeStaticMeshConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	float DefaultMeshScale = 1.f;
+
+	// If specified, only the whitelisted animations will be loaded
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FString> WhitelistedAnimationNames;
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
@@ -1323,6 +1327,12 @@ struct FglTFRuntimeSkeletalAnimationConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	int32 RetargetSkinIndex;
+
+#if 1 // WITH_DIRECTIVE
+	// If specified, only the whitelisted animations will be loaded
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
+	TArray<FString> WhitelistedAnimationNames;
+#endif
 
 	FglTFRuntimeSkeletalAnimationConfig()
 	{
@@ -2091,7 +2101,11 @@ public:
 	void LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const int32 SkinIndex, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode);
 
 	UglTFRuntimeAnimationCurve* LoadNodeAnimationCurve(const int32 NodeIndex);
+#if 1 // WITH_DIRECTIVE
+	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex, const TArray<FString>& WhitelistedAnimationNames);
+#else
 	TArray<UglTFRuntimeAnimationCurve*> LoadAllNodeAnimationCurves(const int32 NodeIndex);
+#endif
 
 	bool GetBuffer(const int32 BufferIndex, FglTFRuntimeBlob& Blob);
 	bool GetBufferView(const int32 BufferViewIndex, FglTFRuntimeBlob& Blob, int64& Stride);

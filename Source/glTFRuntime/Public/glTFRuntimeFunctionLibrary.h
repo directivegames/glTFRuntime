@@ -50,6 +50,8 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "glTF Spawn Asset On Actor"), Category = "glTFRuntime")
 	static AActor* glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
-									  const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig);
+									  const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
+									  const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
+									  const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
 #endif
 };

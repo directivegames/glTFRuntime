@@ -426,8 +426,10 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		{
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(LoadAnimationCurves);
-#endif
+			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index, StaticMeshConfig.WhitelistedAnimationNames);
+#else
 			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
+#endif			
 			TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
 			for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
 			{

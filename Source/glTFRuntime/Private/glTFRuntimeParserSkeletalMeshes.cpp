@@ -1838,6 +1838,19 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 		{
 			return nullptr;
 		}
+#if 1 // WITH_DIRECTIVE
+		if (SkeletalAnimationConfig.WhitelistedAnimationNames.Num())
+		{
+			FString AnimationName;
+			if (JsonAnimationObject->TryGetStringField(TEXT("name"), AnimationName))
+			{
+				if (!SkeletalAnimationConfig.WhitelistedAnimationNames.Contains(AnimationName))
+				{
+					continue;
+				}
+			}
+		}
+#endif
 		float Duration;
 		TMap<FString, FRawAnimSequenceTrack> Tracks;
 		TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;

@@ -382,7 +382,9 @@ TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArr
 
 #if 1 // WITH_DIRECTIVE
 AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
-														const FglTFRuntimeStaticMeshConfig& StaticMeshConfig, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+														const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
+														const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
+														const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
 	if (ensure(WorldContextObject && Asset))
 	{
@@ -410,6 +412,7 @@ AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldC
 			}
 			TempActor->StaticMeshConfig = StaticMeshConfig;
 			TempActor->SkeletalMeshConfig = SkeletalMeshConfig;
+			TempActor->SkeletalAnimationConfig = SkeletalAnimationConfig;
 			TempActor->FinishSpawning(FTransform::Identity);
 
 			if (Actor != TempActor)
