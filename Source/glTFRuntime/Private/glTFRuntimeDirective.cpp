@@ -215,7 +215,10 @@ bool FglTFRuntimeParser::LoadAnimation_Internal(TSharedRef<FJsonObject> JsonAnim
 			continue;
 		}
 
-		Callback(Node, ChannelObject.TargetPath, Samplers[Sampler]);
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNodeAnimation_Callback);
+			Callback(Node, ChannelObject.TargetPath, Samplers[Sampler]);
+		}
 	}
 
 	return true;
@@ -258,9 +261,7 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		AnimationCurve->SetDefaultValues(OriginalTransform.GetLocation(), OriginalTransform.Rotator().Euler(), OriginalTransform.GetScale3D());
 
 		const auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::LoadNodeAnimation_Callback);
-
+		{			
 			static TArray<FglTFRuntimeCurvePoint> Points;
 
 			if (Path == TEXT("translation"))
@@ -405,4 +406,86 @@ void UglTFRuntimeAnimationCurve::AddRotationValues(const TArray<FglTFRuntimeCurv
 void UglTFRuntimeAnimationCurve::AddScaleValues(const TArray<FglTFRuntimeCurvePoint>& Points, ERichCurveInterpMode InterpolationMode)
 {
 	PopulateCurves(ScaleCurves, Points, InterpolationMode);
+}
+
+float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float FrameDelta, int32 FrameNumber, int32& FirstIndex, int32& SecondIndex)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FindBestFrames);
+
+	const auto NumFrames = FramesTimes.Num();
+	const auto FirstFrameTime = FramesTimes[0];
+	if (NumFrames >= 2)
+	{
+		const auto SourceFrameDelta = FramesTimes[1] - FirstFrameTime;
+		if (FMath::IsNearlyEqual(SourceFrameDelta, FrameDelta) &&
+			FMath::IsNearlyZero(FirstFrameTime) &&
+			FramesTimes.IsValidIndex(FrameNumber))
+		{
+			FirstIndex = SecondIndex = FrameNumber;
+			return 0.f;
+		}
+	}
+	else
+	{
+		FirstIndex = SecondIndex = 0;
+		return 0.f;
+	}
+
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FindBestFrames_Slow);
+		const auto WantedTime = FrameDelta * FrameNumber + FirstFrameTime;
+		FirstIndex = INDEX_NONE;
+		SecondIndex = INDEX_NONE;
+		auto BeginIndex = 0;
+		auto EndIndex = NumFrames - 1;
+		while (BeginIndex <= EndIndex)
+		{
+			const auto MiddleIndex = (BeginIndex + EndIndex) / 2;
+			if (MiddleIndex == BeginIndex || MiddleIndex == EndIndex)
+			{
+				FirstIndex = BeginIndex;
+				SecondIndex = EndIndex;
+				break;
+			}
+			const auto MiddleFrameTime = FramesTimes[MiddleIndex];
+			if (FMath::IsNearlyEqual(MiddleFrameTime, WantedTime))
+			{
+				FirstIndex = MiddleIndex;
+				SecondIndex = MiddleIndex;
+				break;
+			}
+			else if (MiddleFrameTime < WantedTime)
+			{
+				BeginIndex = MiddleIndex;
+			}
+			else
+			{
+				EndIndex = MiddleIndex;
+			}
+		}
+
+		check(FirstIndex != INDEX_NONE);
+		if (FirstIndex == SecondIndex)
+		{
+			return 0.f;
+		}
+		else
+		{
+			const auto Alpha = (WantedTime - FramesTimes[FirstIndex]) / (FramesTimes[SecondIndex] - FramesTimes[FirstIndex]);
+			if (Alpha < 0.f)
+			{
+				FirstIndex = SecondIndex = 0;
+				return 0.f;
+			}
+			else if (Alpha > 1.f)
+			{
+				FirstIndex = SecondIndex = NumFrames - 1;
+				return 0.f;
+			}
+			else
+			{
+				return Alpha;
+			}
+		}
+	}
 }

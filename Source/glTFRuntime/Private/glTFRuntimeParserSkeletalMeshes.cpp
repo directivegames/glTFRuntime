@@ -1780,6 +1780,9 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationByName(USkeletalMesh* Sk
 
 UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* SkeletalMesh, const int32 NodeIndex, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(LoadNodeSkeletalAnimation);
+#endif
 
 	if (!SkeletalMesh)
 	{
@@ -2778,6 +2781,10 @@ FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const f
 
 bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
 {
+#if 1 // WITH_DIRECTIVE
+	TRACE_CPUPROFILER_EVENT_SCOPE(LoadSkeletalAnimation_Internal);
+#endif
+
 	TArray<FTransform> AnimWorldTransforms;
 	TArray<FTransform> RetargetWorldTransforms;
 	FReferenceSkeleton AnimRefSkeleton;
@@ -2892,6 +2899,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 			if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
 			{
+#if 1 // WITH_DIRECTIVE
+				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Rotation);
+#endif
 				if (Curve.Timeline.Num() != Curve.Values.Num())
 				{
 					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for rotation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
@@ -2905,13 +2915,22 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 				FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
+#if 1 // WITH_DIRECTIVE
+				const auto TransformPose = SkeletalAnimationConfig.TransformPose.Find(TrackName);
+				const auto bRemapperBound = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound();
+#endif
+
 				for (int32 Frame = 0; Frame < NumFrames; Frame++)
 				{
 					const float FrameBase = FrameDelta * Frame;
 					FQuat AnimQuat;
 					int32 FirstIndex;
 					int32 SecondIndex;
+#if 1 // WITH_DIRECTIVE
+					float Alpha = FindBestFrames(Curve.Timeline, FrameDelta, Frame, FirstIndex, SecondIndex);
+#else
 					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+#endif
 					FVector4 FirstQuatV = Curve.Values[FirstIndex];
 					FVector4 SecondQuatV = Curve.Values[SecondIndex];
 					FQuat FirstQuat = FQuat(FirstQuatV.X, FirstQuatV.Y, FirstQuatV.Z, FirstQuatV.W).GetNormalized();
@@ -2978,6 +2997,17 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 						}
 					}
 
+#if 1 // WITH_DIRECTIVE
+					if (TransformPose)
+					{
+						AnimQuat = TransformPose->TransformRotation(AnimQuat);
+					}
+
+					if (bRemapperBound)
+					{
+						AnimQuat = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.Execute(TrackName, Frame, AnimQuat.Rotator(), SkeletalAnimationConfig.FrameRotationRemapper.Context).Quaternion();
+					}
+#else
 					if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
 					{
 						AnimQuat = SkeletalAnimationConfig.TransformPose[TrackName].TransformRotation(AnimQuat);
@@ -2987,6 +3017,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					{
 						AnimQuat = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.Execute(TrackName, Frame, AnimQuat.Rotator(), SkeletalAnimationConfig.FrameRotationRemapper.Context).Quaternion();
 					}
+#endif
 
 #if ENGINE_MAJOR_VERSION > 4
 					Track.RotKeys.Add(FQuat4f(AnimQuat));
@@ -2997,6 +3028,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			}
 			else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 			{
+#if 1 // WITH_DIRECTIVE
+				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Translation);
+#endif
 				if (Curve.Timeline.Num() != Curve.Values.Num())
 				{
 					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for translation on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
@@ -3010,13 +3044,21 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 				FRawAnimSequenceTrack& Track = Tracks[TrackName];
 
+#if 1 // WITH_DIRECTIVE
+				const auto TransformPose = SkeletalAnimationConfig.TransformPose.Find(TrackName);
+				const auto bRemapperBound = SkeletalAnimationConfig.FrameRotationRemapper.Remapper.IsBound();
+#endif
 				for (int32 Frame = 0; Frame < NumFrames; Frame++)
 				{
 					const float FrameBase = FrameDelta * Frame;
 					FVector AnimLocation;
 					int32 FirstIndex;
 					int32 SecondIndex;
+#if 1 // WITH_DIRECTIVE
+					float Alpha = FindBestFrames(Curve.Timeline, FrameDelta, Frame, FirstIndex, SecondIndex);
+#else
 					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+#endif
 					FVector4 First = Curve.Values[FirstIndex];
 					FVector4 Second = Curve.Values[SecondIndex];
 
@@ -3072,6 +3114,17 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 						}
 					}
 
+#if 1 // WITH_DIRECTIVE
+					if (TransformPose)
+					{
+						AnimLocation = TransformPose->TransformPosition(AnimLocation);
+					}
+
+					if (bRemapperBound)
+					{
+						AnimLocation = SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.Execute(TrackName, Frame, AnimLocation, SkeletalAnimationConfig.FrameRotationRemapper.Context);
+					}
+#else
 					if (SkeletalAnimationConfig.TransformPose.Contains(TrackName))
 					{
 						AnimLocation = SkeletalAnimationConfig.TransformPose[TrackName].TransformPosition(AnimLocation);
@@ -3081,6 +3134,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					{
 						AnimLocation = SkeletalAnimationConfig.FrameTranslationRemapper.Remapper.Execute(TrackName, Frame, AnimLocation, SkeletalAnimationConfig.FrameRotationRemapper.Context);
 					}
+#endif
 
 #if ENGINE_MAJOR_VERSION > 4
 					Track.PosKeys.Add(FVector3f(AnimLocation));
@@ -3091,6 +3145,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			}
 			else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 			{
+#if 1 // WITH_DIRECTIVE
+				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Scale);
+#endif
 				if (Curve.Timeline.Num() != Curve.Values.Num())
 				{
 					AddError("LoadSkeletalAnimation_Internal()", FString::Printf(TEXT("Animation input/output mismatch (%d/%d) for scale on node %d"), Curve.Timeline.Num(), Curve.Values.Num(), Node.Index));
@@ -3109,7 +3166,11 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					const float FrameBase = FrameDelta * Frame;
 					int32 FirstIndex;
 					int32 SecondIndex;
+#if 1 // WITH_DIRECTIVE
+					float Alpha = FindBestFrames(Curve.Timeline, FrameDelta, Frame, FirstIndex, SecondIndex);
+#else
 					float Alpha = FindBestFrames(Curve.Timeline, FrameBase, FirstIndex, SecondIndex);
+#endif
 					FVector4 First = Curve.Values[FirstIndex];
 					FVector4 Second = Curve.Values[SecondIndex];
 #if ENGINE_MAJOR_VERSION > 4
@@ -3121,6 +3182,9 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 			}
 			else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
 			{
+#if 1 // WITH_DIRECTIVE
+				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Weights);
+#endif
 				TArray<FName> MorphTargetNames;
 				if (!GetMorphTargetNames(Node.MeshIndex, MorphTargetNames))
 				{

@@ -3620,6 +3620,7 @@ void FglTFRuntimeParser::ClearCache()
 #endif
 }
 
+#if 0 // WITH_DIRECTIVE
 float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex)
 {
 	SecondIndex = INDEX_NONE;
@@ -3656,6 +3657,7 @@ float FglTFRuntimeParser::FindBestFrames(const TArray<float>& FramesTimes, float
 
 	return ((WantedTime + FramesTimes[0]) - FramesTimes[FirstIndex]) / (FramesTimes[SecondIndex] - FramesTimes[FirstIndex]);
 }
+#endif
 
 bool FglTFRuntimeParser::MergePrimitives(TArray<FglTFRuntimePrimitive> SourcePrimitives, FglTFRuntimePrimitive& OutPrimitive)
 {

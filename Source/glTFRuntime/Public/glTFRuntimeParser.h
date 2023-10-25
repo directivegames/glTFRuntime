@@ -2393,7 +2393,11 @@ public:
 protected:
 	bool FillJsonMatrix(const TArray<TSharedPtr<FJsonValue>>* JsonMatrixValues, FMatrix& Matrix);
 
+#if 1 // WITH_DIRECTIVE
+	float FindBestFrames(const TArray<float>& FramesTimes, float FrameDelta, int32 FrameNumber, int32& FirstIndex, int32& SecondIndex);
+#else
 	float FindBestFrames(const TArray<float>& FramesTimes, float WantedTime, int32& FirstIndex, int32& SecondIndex);
+#endif
 
 	void NormalizeSkeletonScale(FReferenceSkeleton& RefSkeleton);
 	void NormalizeSkeletonBoneScale(FReferenceSkeletonModifier& Modifier, const int32 BoneIndex, FVector BoneScale);
