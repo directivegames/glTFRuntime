@@ -22,12 +22,14 @@ protected:
 
 	virtual void ProcessNode(USceneComponent* NodeParentComponent, const FName SocketName, FglTFRuntimeNode& Node);
 
+#if 0 // WITH_DIRECTIVE
 	TMap<USceneComponent*, float>  CurveBasedAnimationsTimeTracker;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "glTFRuntime")
 	TSet<FString> DiscoveredCurveAnimationsNames;
 
 	TMap<USceneComponent*, TMap<FString, UglTFRuntimeAnimationCurve*>> DiscoveredCurveAnimations;
+#endif
 
 	template<typename T>
 	FName GetSafeNodeName(const FglTFRuntimeNode& Node)
@@ -63,8 +65,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	FglTFRuntimeLightConfig LightConfig;
 
+#if 0 // WITH_DIRECTIVE
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
 	TMap<USceneComponent*, UglTFRuntimeAnimationCurve*> CurveBasedAnimations;
+#endif
 
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On StaticMeshComponent Created"))
 	void ReceiveOnStaticMeshComponentCreated(UStaticMeshComponent* StaticMeshComponent, const FglTFRuntimeNode& Node);
@@ -72,8 +76,10 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "glTFRuntime", meta = (DisplayName = "On SkeletalMeshComponent Created"))
 	void ReceiveOnSkeletalMeshComponentCreated(USkeletalMeshComponent* SkeletalMeshComponent, const FglTFRuntimeNode& Node);
 
+#if 0 // WITH_DIRECTIVE
 	UFUNCTION(BlueprintCallable, Category = "glTFRuntime")
 	void SetCurveAnimationByName(const FString& CurveAnimationName);
+#endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	bool bAllowNodeAnimations;
@@ -111,5 +117,6 @@ private:
 #if 1 // WITH_DIRECTIVE
 	void CustomAddInstanceComponent(UActorComponent* Component);
 	AActor* GetComponentOwner();
+	class UglTFRuntimeAssetActorComponent* GetAssetComponent();
 #endif
 };

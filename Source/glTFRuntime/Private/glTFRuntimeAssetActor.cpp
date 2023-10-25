@@ -11,6 +11,7 @@
 
 #if 1 // WITH_DIRECTIVE
 #include "RigidBodySkeletalMeshComponent.h"
+#include "Directive/glTFRuntimeAssetActorComponent.h"
 #include "glTFRuntimeStats.h"
 #endif
 
@@ -85,6 +86,10 @@ void AglTFRuntimeAssetActor::BeginPlay()
 			}
 		}
 	}
+
+#if 1 // WITH_DIRECTIVE
+	auto& CurveBasedAnimations = GetAssetComponent()->CurveBasedAnimations;
+#endif
 
 	for (TPair<USceneComponent*, FName>& Pair : SocketMapping)
 	{
@@ -427,10 +432,16 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(LoadAnimationCurves);
 			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index, StaticMeshConfig.WhitelistedAnimationNames);
+			auto AssetComponent = GetAssetComponent();
+			auto& CurveBasedAnimations = AssetComponent->CurveBasedAnimations;
+			auto& CurveBasedAnimationsTimeTracker = AssetComponent->CurveBasedAnimationsTimeTracker;
+			auto& DiscoveredCurveAnimationsNames = AssetComponent->DiscoveredCurveAnimationsNames;
+			auto& DiscoveredCurveAnimations = AssetComponent->DiscoveredCurveAnimations;
+			TMap<FString, TWeakObjectPtr<UglTFRuntimeAnimationCurve>> ComponentAnimationCurvesMap;
 #else
 			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
-#endif			
 			TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;
+#endif						
 			for (UglTFRuntimeAnimationCurve* ComponentAnimationCurve : ComponentAnimationCurves)
 			{
 				if (!CurveBasedAnimations.Contains(NewComponent))
@@ -489,6 +500,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 }
 
+#if 0 // WITH_DIRECTIVE
 void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimationName)
 {
 	if (!DiscoveredCurveAnimationsNames.Contains(CurveAnimationName))
@@ -511,14 +523,15 @@ void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimati
 		}
 
 	}
-
 }
+#endif
 
 // Called every frame
 void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+#if 0 // WITH_DIRECTIVE
 	for (TPair<USceneComponent*, UglTFRuntimeAnimationCurve*>& Pair : CurveBasedAnimations)
 	{
 		// the curve could be null
@@ -544,6 +557,7 @@ void AglTFRuntimeAssetActor::Tick(float DeltaTime)
 		}
 		CurveBasedAnimationsTimeTracker[Pair.Key] += DeltaTime;
 	}
+#endif
 }
 
 void AglTFRuntimeAssetActor::ReceiveOnStaticMeshComponentCreated_Implementation(UStaticMeshComponent* StaticMeshComponent, const FglTFRuntimeNode& Node)
@@ -578,8 +592,22 @@ AActor* AglTFRuntimeAssetActor::GetComponentOwner()
 		return this;
 	}
 }
+
 void AglTFRuntimeAssetActor::CustomAddInstanceComponent(UActorComponent* Component)
 {
 	GetComponentOwner()->AddInstanceComponent(Component);
 }
+
+UglTFRuntimeAssetActorComponent* AglTFRuntimeAssetActor::GetAssetComponent()
+{
+	auto ComponentOwner = GetComponentOwner();
+	auto AssetComponent = ComponentOwner->FindComponentByClass<UglTFRuntimeAssetActorComponent>();
+	if (!AssetComponent)
+	{
+		AssetComponent = NewObject<UglTFRuntimeAssetActorComponent>(ComponentOwner);
+		AssetComponent->RegisterComponent();
+	}
+	return AssetComponent;
+}
+
 #endif
