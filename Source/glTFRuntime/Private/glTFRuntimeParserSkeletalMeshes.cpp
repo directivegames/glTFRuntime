@@ -1855,22 +1855,17 @@ UAnimSequence* FglTFRuntimeParser::LoadNodeSkeletalAnimation(USkeletalMesh* Skel
 		TMap<FString, FRawAnimSequenceTrack> Tracks;
 		TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
 		bool bAnimationFound = false;
-		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
-			{
 #if 1 // WITH_DIRECTIVE
-				if ((Node.Index == NodeIndex) || Joints.Contains(Node.Index))
-				{
-					bAnimationFound = true;
-					return true;
-				}
-				return false;
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), nullptr, &MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
 #else
+		if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [&Joints, &bAnimationFound, NodeIndex](const FglTFRuntimeNode& Node) -> bool
+#endif		
+			{
 				if (!bAnimationFound)
 				{
 					bAnimationFound = (Node.Index == NodeIndex) || Joints.Contains(Node.Index);
 				}
 				return true;
-#endif
 			}))
 		{
 			return nullptr;
@@ -1903,9 +1898,12 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimation(USkeletalMesh* Skeletal
 
 	float Duration;
 	TMap<FString, FRawAnimSequenceTrack> Tracks;
-
 	TMap<FName, TArray<TPair<float, float>>> MorphTargetCurves;
+#if 1 // WITH_DIRECTIVE
+	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), &Tracks, &MorphTargetCurves, Duration, SkeletalAnimationConfig, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
+#else
 	if (!LoadSkeletalAnimation_Internal(JsonAnimationObject.ToSharedRef(), Tracks, MorphTargetCurves, Duration, SkeletalAnimationConfig, [](const FglTFRuntimeNode& Node) -> bool { return true; }))
+#endif	
 	{
 		return nullptr;
 	}
@@ -2805,10 +2803,14 @@ FVector4 FglTFRuntimeParser::CubicSpline(const float TC, const float T0, const f
 	return CubicValue;
 }
 
-bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>& Tracks, TMap<FName, TArray<TPair<float, float>>>& MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
-{
+
 #if 1 // WITH_DIRECTIVE
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>* Tracks, TMap<FName, TArray<TPair<float, float>>>* MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode& Node)> Filter)
+{
 	TRACE_CPUPROFILER_EVENT_SCOPE(LoadSkeletalAnimation_Internal);
+#else
+bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> JsonAnimationObject, TMap<FString, FRawAnimSequenceTrack>&Tracks, TMap<FName, TArray<TPair<float, float>>>&MorphTargetCurves, float& Duration, const FglTFRuntimeSkeletalAnimationConfig & SkeletalAnimationConfig, TFunctionRef<bool(const FglTFRuntimeNode & Node)> Filter)
+{
 #endif
 
 	TArray<FTransform> AnimWorldTransforms;
@@ -2923,7 +2925,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 
 			float FrameDelta = 1.f / SkeletalAnimationConfig.FramesPerSecond;
 
-			if (Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
+			if (Tracks && Path == "rotation" && !SkeletalAnimationConfig.bRemoveRotations)
 			{
 #if 1 // WITH_DIRECTIVE
 				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Rotation);
@@ -2934,12 +2936,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					return;
 				}
 
-				if (!Tracks.Contains(TrackName))
+				if (!Tracks->Contains(TrackName))
 				{
-					Tracks.Add(TrackName, FRawAnimSequenceTrack());
+					Tracks->Add(TrackName, FRawAnimSequenceTrack());
 				}
 
-				FRawAnimSequenceTrack& Track = Tracks[TrackName];
+				FRawAnimSequenceTrack& Track = (*Tracks)[TrackName];
 
 #if 1 // WITH_DIRECTIVE
 				const auto TransformPose = SkeletalAnimationConfig.TransformPose.Find(TrackName);
@@ -3059,7 +3061,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #endif
 				}
 			}
-			else if (Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
+			else if (Tracks && Path == "translation" && !SkeletalAnimationConfig.bRemoveTranslations)
 			{
 #if 1 // WITH_DIRECTIVE
 				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Translation);
@@ -3070,12 +3072,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					return;
 				}
 
-				if (!Tracks.Contains(TrackName))
+				if (!Tracks->Contains(TrackName))
 				{
-					Tracks.Add(TrackName, FRawAnimSequenceTrack());
+					Tracks->Add(TrackName, FRawAnimSequenceTrack());
 				}
 
-				FRawAnimSequenceTrack& Track = Tracks[TrackName];
+				FRawAnimSequenceTrack& Track = (*Tracks)[TrackName];
 
 #if 1 // WITH_DIRECTIVE
 				const auto TransformPose = SkeletalAnimationConfig.TransformPose.Find(TrackName);
@@ -3182,7 +3184,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #endif
 				}
 			}
-			else if (Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
+			else if (Tracks && Path == "scale" && !SkeletalAnimationConfig.bRemoveScales)
 			{
 #if 1 // WITH_DIRECTIVE
 				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Scale);
@@ -3193,12 +3195,12 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 					return;
 				}
 
-				if (!Tracks.Contains(TrackName))
+				if (!Tracks->Contains(TrackName))
 				{
-					Tracks.Add(TrackName, FRawAnimSequenceTrack());
+					Tracks->Add(TrackName, FRawAnimSequenceTrack());
 				}
 
-				FRawAnimSequenceTrack& Track = Tracks[TrackName];
+				FRawAnimSequenceTrack& Track = (*Tracks)[TrackName];
 
 #if 1 // WITH_DIRECTIVE
 				Track.ScaleKeys.Reserve(NumFrames);
@@ -3223,7 +3225,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 #endif
 				}
 			}
-			else if (Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
+			else if (MorphTargetCurves && Path == "weights" && !SkeletalAnimationConfig.bRemoveMorphTargets)
 			{
 #if 1 // WITH_DIRECTIVE
 				TRACE_CPUPROFILER_EVENT_SCOPE(SkeletalAnimation_CB_Weights);
@@ -3251,7 +3253,7 @@ bool FglTFRuntimeParser::LoadSkeletalAnimation_Internal(TSharedRef<FJsonObject> 
 						TPair<float, float> NewCurve = TPair<float, float>(Curve.Timeline[TimelineIndex], Curve.Values[TimelineIndex * MorphTargetNames.Num() + MorphTargetIndex].X);
 						Curves.Add(NewCurve);
 					}
-					MorphTargetCurves.Add(MorphTargetName, Curves);
+					MorphTargetCurves->Add(MorphTargetName, Curves);
 				}
 			}
 		};
