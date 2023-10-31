@@ -1,6 +1,6 @@
 // Copyright (C) 2020 - Directive Games Limited - All Rights Reserved
 
-#include "glTFRuntimeSettings.h"
+#include "Directive/glTFRuntimeSettings.h"
 
 static UMaterialInterface* GetIfValid(const TArray<UMaterialInterface*>& Materials, int index)
 {
@@ -14,6 +14,7 @@ static UMaterialInterface* GetIfValid(const TArray<UMaterialInterface*>& Materia
 
 UglTFRuntimeSettings::UglTFRuntimeSettings()
 {
+#if 0
 	auto MaterialLoader = GetDefault<UglTFMaterialLoader>();
 	const auto& Materials = MaterialLoader->LoadedMaterials;
 	MetallicRoughnessMaterialsMap = {
@@ -29,4 +30,5 @@ UglTFRuntimeSettings::UglTFRuntimeSettings()
 		{ EglTFRuntimeMaterialType::TwoSided, GetIfValid(Materials, 6) },
 		{ EglTFRuntimeMaterialType::TwoSidedTranslucent, GetIfValid(Materials, 7) },
 	};
+#endif
 }

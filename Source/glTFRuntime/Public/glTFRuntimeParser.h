@@ -2748,7 +2748,19 @@ class UglTFMaterialLoader : public UObject
 
 public:
 	UPROPERTY()
-	TArray<class UMaterialInterface*> LoadedMaterials;
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> MetallicRoughnessMaterialsMap;
+
+	UPROPERTY()
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> SpecularGlossinessMaterialsMap;
+
+	UPROPERTY()
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> UnlitMaterialsMap;
+
+	UPROPERTY()
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> TransmissionMaterialsMap;
+
+	UPROPERTY()
+	TMap<EglTFRuntimeMaterialType, UMaterialInterface*> ClearCoatMaterialsMap;
 
 	UglTFMaterialLoader();
 };

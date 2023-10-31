@@ -11,7 +11,7 @@
 #include "LevelEditor.h"
 
 #if 1 // WITH_DIRECTIVE
-#include "glTFRuntimeSettings.h"
+#include "Directive/glTFRuntimeSettings.h"
 #include "ISettingsModule.h"
 #endif
 

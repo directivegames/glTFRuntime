@@ -17,9 +17,11 @@ class GLTFRUNTIME_API UglTFRuntimeSettings : public UObject
 public:
 	UglTFRuntimeSettings();
 
+#if 0
 	UPROPERTY(EditAnywhere, Config)
 	TMap<EglTFRuntimeMaterialType, TSoftObjectPtr<UMaterialInterface>> MetallicRoughnessMaterialsMap;
 
 	UPROPERTY(EditAnywhere, Config)
 	TMap<EglTFRuntimeMaterialType, TSoftObjectPtr<UMaterialInterface>> SpecularGlossinessMaterialsMap;
+#endif
 };

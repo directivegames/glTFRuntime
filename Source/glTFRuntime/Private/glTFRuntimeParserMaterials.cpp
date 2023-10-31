@@ -19,7 +19,7 @@
 #include "TextureResource.h"
 
 #if 1 // WITH_DIRECTIVE
-#include "glTFRuntimeSettings.h"
+#include "Directive/glTFRuntimeSettings.h"
 #include "glTFRuntimeStats.h"
 #include "MaterialDomain.h"
 #endif
@@ -462,7 +462,7 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 		}
 	}
 
-#if 1 // WITH_DIRECTIVE
+#if 0 // WITH_DIRECTIVE
 	if (auto RuntimeSettings = GetDefault<UglTFRuntimeSettings>())
 	{
 		if (auto Record = RuntimeSettings->MetallicRoughnessMaterialsMap.Find(RuntimeMaterial.MaterialType))

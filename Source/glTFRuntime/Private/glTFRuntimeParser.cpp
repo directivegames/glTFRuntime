@@ -403,7 +403,21 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 	return Parser;
 }
 
+#if 1 // WITH_DIRECTIVE
 void FglTFRuntimeParser::LoadAndFillBaseMaterials()
+{
+	const auto MaterialLoader = GetDefault<UglTFMaterialLoader>();
+	MetallicRoughnessMaterialsMap = MaterialLoader->MetallicRoughnessMaterialsMap;
+	SpecularGlossinessMaterialsMap = MaterialLoader->SpecularGlossinessMaterialsMap;
+	UnlitMaterialsMap = MaterialLoader->UnlitMaterialsMap;
+	TransmissionMaterialsMap = MaterialLoader->TransmissionMaterialsMap;
+	ClearCoatMaterialsMap = MaterialLoader->ClearCoatMaterialsMap;
+}
+
+UglTFMaterialLoader::UglTFMaterialLoader()
+#else
+void FglTFRuntimeParser::LoadAndFillBaseMaterials()
+#endif
 {
 	UMaterialInterface* OpaqueMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/glTFRuntime/M_glTFRuntimeBase"));
 	if (OpaqueMaterial)
@@ -5093,28 +5107,3 @@ float FglTFRuntimeParser::GetDownloadTime() const
 {
 	return DownloadTime;
 }
-
-#if 1 // WITH_DIRECTIVE
-#include "UObject/ConstructorHelpers.h"
-
-UglTFMaterialLoader::UglTFMaterialLoader()
-{
-	// see FglTFRuntimeParser::FglTFRuntimeParser
-	static const TArray<FString> MaterialPaths = {
-		TEXT("/glTFRuntime/M_glTFRuntimeBase.M_glTFRuntimeBase"),
-		TEXT("/glTFRuntime/M_glTFRuntimeTranslucent_Inst.M_glTFRuntimeTranslucent_Inst"),
-		TEXT("/glTFRuntime/M_glTFRuntimeTwoSided_Inst.M_glTFRuntimeTwoSided_Inst"),
-		TEXT("/glTFRuntime/M_glTFRuntimeTwoSidedTranslucent_Inst.M_glTFRuntimeTwoSidedTranslucent_Inst"),
-		TEXT("/glTFRuntime/M_glTFRuntime_SG_Base.M_glTFRuntime_SG_Base"),
-		TEXT("/glTFRuntime/M_glTFRuntime_SG_Translucent_Inst.M_glTFRuntime_SG_Translucent_Inst"),
-		TEXT("/glTFRuntime/M_glTFRuntime_SG_TwoSided_Inst.M_glTFRuntime_SG_TwoSided_Inst"),
-		TEXT("/glTFRuntime/M_glTFRuntime_SG_TwoSidedTranslucent_Inst.M_glTFRuntime_SG_TwoSidedTranslucent_Inst")
-	};
-
-	for (const auto& MaterialPath : MaterialPaths)
-	{
-		ConstructorHelpers::FObjectFinder<UMaterialInterface> MaterialRef(*MaterialPath);
-		LoadedMaterials.Add(MaterialRef.Object);
-	}
-}
-#endif
