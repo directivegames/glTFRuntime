@@ -8,7 +8,7 @@
 
 #define LOCTEXT_NAMESPACE "FglTFRuntimeModule"
 
-#if 1 // WITH_DIRECTIVE
+#if ENABLE_LOW_LEVEL_MEM_TRACKER // WITH_DIRECTIVE
 static void RegisterTag(EglTFRuntimeLLMTag Tag, const FString& Name, const FName& StatName)
 {
 	LLM(FLowLevelMemTracker::Get().RegisterProjectTag((int32)Tag, *Name, StatName, NAME_None));
@@ -17,7 +17,7 @@ static void RegisterTag(EglTFRuntimeLLMTag Tag, const FString& Name, const FName
 
 void FglTFRuntimeModule::StartupModule()
 {
-#if 1 // WITH_DIRECTIVE
+#if ENABLE_LOW_LEVEL_MEM_TRACKER // WITH_DIRECTIVE
 	RegisterTag(EglTFRuntimeLLMTag::LoadAssets, TEXT("glTF Load Assets"), GET_STATFNAME(STAT_LoadAssetsLLM));
 	RegisterTag(EglTFRuntimeLLMTag::LoadStaticMesh, TEXT("glTF Load Static Mesh"), GET_STATFNAME(STAT_LoadStaticMeshLLM));
 	RegisterTag(EglTFRuntimeLLMTag::LoadSkeletalMesh, TEXT("glTF Load Skeletal Mesh"), GET_STATFNAME(STAT_LoadSkeletalMeshLLM));
