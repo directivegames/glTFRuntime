@@ -606,6 +606,12 @@ AActor* AglTFRuntimeAssetActor::GetComponentOwner()
 void AglTFRuntimeAssetActor::CustomAddInstanceComponent(UActorComponent* Component)
 {
 	GetComponentOwner()->AddInstanceComponent(Component);
+#if WITH_EDITOR
+	if (Component)
+	{
+		Component->CreationMethod = EComponentCreationMethod::Instance;
+	}
+#endif
 }
 
 UglTFRuntimeAssetActorComponent* AglTFRuntimeAssetActor::GetAssetComponent()
