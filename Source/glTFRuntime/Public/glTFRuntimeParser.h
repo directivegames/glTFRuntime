@@ -1387,8 +1387,22 @@ struct FglTFRuntimeUInt16Vector4
 	}
 };
 
+#if 1 // WITH_DIRECTIVE
+struct FglTFRuntimePrimitive : public FGCObject
+{
+	FString GetReferencerName() const override
+	{
+		return "FglTFRuntimePrimitive";
+	}
+
+	void AddReferencedObjects(FReferenceCollector& Collector) override
+	{
+		Collector.AddReferencedObject(Material);
+	}
+#else
 struct FglTFRuntimePrimitive
 {
+#endif
 	TArray<FVector> Positions;
 	TArray<FVector> Normals;
 	TArray<FVector4> Tangents;
@@ -1794,8 +1808,31 @@ struct FglTFRuntimeTextureTransform
 	}
 };
 
+#if 1 // WITH_DIRECTIVE
+struct FglTFRuntimeMaterial : public FGCObject
+{
+	FString GetReferencerName() const override
+	{
+		return "FglTFRuntimeMaterial";
+}
+
+	void AddReferencedObjects(FReferenceCollector& Collector) override
+	{
+		Collector.AddReferencedObject(BaseColorTextureCache);
+		Collector.AddReferencedObject(MetallicRoughnessTextureCache);
+		Collector.AddReferencedObject(NormalTextureCache);
+		Collector.AddReferencedObject(OcclusionTextureCache);
+		Collector.AddReferencedObject(EmissiveTextureCache);
+		Collector.AddReferencedObject(SpecularGlossinessTextureCache);
+		Collector.AddReferencedObject(SpecularTextureCache);
+		Collector.AddReferencedObject(DiffuseTextureCache);
+		Collector.AddReferencedObject(TransmissionTextureCache);
+		
+	}
+#else
 struct FglTFRuntimeMaterial
 {
+#endif
 	bool bTwoSided;
 	bool bTranslucent;
 	float AlphaCutoff;
