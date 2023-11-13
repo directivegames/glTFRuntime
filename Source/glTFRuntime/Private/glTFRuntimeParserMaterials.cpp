@@ -419,6 +419,10 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 UMaterialInterface* FglTFRuntimeParser::BuildVertexColorOnlyMaterial(const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	const auto& MetallicRoughnessMaterialsMap = GetMetallicRoughnessMaterialsMap();
+#endif
+
 	UMaterialInterface* BaseMaterial = MetallicRoughnessMaterialsMap[EglTFRuntimeMaterialType::TwoSided];
 
 	if (MaterialsConfig.VertexColorOnlyMaterial)
@@ -443,6 +447,11 @@ UMaterialInterface* FglTFRuntimeParser::BuildMaterial(const int32 Index, const F
 #if 1 // WITH_DIRECTIVE
 	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildMaterial);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildMaterial);
+	const auto& MetallicRoughnessMaterialsMap = GetMetallicRoughnessMaterialsMap();
+	const auto& SpecularGlossinessMaterialsMap = GetSpecularGlossinessMaterialsMap();
+	const auto& UnlitMaterialsMap = GetUnlitMaterialsMap();
+	const auto& ClearCoatMaterialsMap = GetClearCoatMaterialsMap();
+	const auto& TransmissionMaterialsMap = GetTransmissionMaterialsMap();
 #endif
 
 	SCOPED_NAMED_EVENT(FglTFRuntimeParser_BuildMaterial, FColor::Magenta);

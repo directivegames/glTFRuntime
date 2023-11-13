@@ -404,14 +404,33 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromBinary(const uint8* DataP
 }
 
 #if 1 // WITH_DIRECTIVE
+const TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& FglTFRuntimeParser::GetMetallicRoughnessMaterialsMap() const
+{
+	return GetDefault<UglTFMaterialLoader>()->MetallicRoughnessMaterialsMap;
+}
+
+const TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& FglTFRuntimeParser::GetSpecularGlossinessMaterialsMap() const
+{
+	return GetDefault<UglTFMaterialLoader>()->SpecularGlossinessMaterialsMap;
+}
+
+const TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& FglTFRuntimeParser::GetUnlitMaterialsMap() const
+{
+	return GetDefault<UglTFMaterialLoader>()->UnlitMaterialsMap;
+}
+
+const TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& FglTFRuntimeParser::GetTransmissionMaterialsMap() const
+{
+	return GetDefault<UglTFMaterialLoader>()->TransmissionMaterialsMap;
+}
+
+const TMap<EglTFRuntimeMaterialType, UMaterialInterface*>& FglTFRuntimeParser::GetClearCoatMaterialsMap() const
+{
+	return GetDefault<UglTFMaterialLoader>()->ClearCoatMaterialsMap;
+}
+
 void FglTFRuntimeParser::LoadAndFillBaseMaterials()
 {
-	const auto MaterialLoader = GetDefault<UglTFMaterialLoader>();
-	MetallicRoughnessMaterialsMap = MaterialLoader->MetallicRoughnessMaterialsMap;
-	SpecularGlossinessMaterialsMap = MaterialLoader->SpecularGlossinessMaterialsMap;
-	UnlitMaterialsMap = MaterialLoader->UnlitMaterialsMap;
-	TransmissionMaterialsMap = MaterialLoader->TransmissionMaterialsMap;
-	ClearCoatMaterialsMap = MaterialLoader->ClearCoatMaterialsMap;
 }
 
 UglTFMaterialLoader::UglTFMaterialLoader()
@@ -3600,15 +3619,17 @@ void FglTFRuntimeParser::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObjects(SkeletonsCache);
 	Collector.AddReferencedObjects(SkeletalMeshesCache);
 	Collector.AddReferencedObjects(TexturesCache);
+
+#if 0 // WITH_DIRECTIVE
 	Collector.AddReferencedObjects(MetallicRoughnessMaterialsMap);
 	Collector.AddReferencedObjects(SpecularGlossinessMaterialsMap);
 	Collector.AddReferencedObjects(UnlitMaterialsMap);
 	Collector.AddReferencedObjects(TransmissionMaterialsMap);
-
-#if 1 // WITH_DIRECTIVE
 	Collector.AddReferencedObjects(ClearCoatMaterialsMap);
-	Collector.AddReferencedObjects(MaterialsNameCache);
+#endif
 
+#if 1 // WITH_DIRECTIVE	
+	Collector.AddReferencedObjects(MaterialsNameCache);
 	for (auto& Itr : AnimationCurvesCache)
 	{
 		Collector.AddReferencedObjects(Itr.Value);
@@ -3623,13 +3644,16 @@ void FglTFRuntimeParser::ClearCache()
 	SkeletonsCache.Empty();
 	SkeletalMeshesCache.Empty();
 	TexturesCache.Empty();
+
+#if 0 // WITH_DIRECTIVE
 	MetallicRoughnessMaterialsMap.Empty();
 	SpecularGlossinessMaterialsMap.Empty();
 	UnlitMaterialsMap.Empty();
 	TransmissionMaterialsMap.Empty();
+	ClearCoatMaterialsMap.Empty();
+#endif
 
 #if 1 // WITH_DIRECTIVE
-	ClearCoatMaterialsMap.Empty();
 	MaterialsNameCache.Empty();
 #endif
 }
