@@ -1040,7 +1040,11 @@ USkeletalMesh* FglTFRuntimeParser::FinalizeSkeletalMeshWithLODs(TSharedRef<FglTF
 #else
 			TArray<FSkeletalMaterial>& SkeletalMaterials = SkeletalMeshContext->SkeletalMesh->Materials;
 #endif
+#if 1 // WITH_DIRECTIVE
+			int32 NewMatIndex = SkeletalMaterials.Add((UMaterialInterface*)SkeletalMeshContext->LODs[LODIndex]->Primitives[MatIndex].Material);
+#else
 			int32 NewMatIndex = SkeletalMaterials.Add(SkeletalMeshContext->LODs[LODIndex]->Primitives[MatIndex].Material);
+#endif
 
 
 			SkeletalMaterials[NewMatIndex].UVChannelData.bInitialized = true;

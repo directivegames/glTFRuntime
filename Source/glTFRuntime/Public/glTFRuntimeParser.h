@@ -1388,27 +1388,56 @@ struct FglTFRuntimeUInt16Vector4
 };
 
 #if 1 // WITH_DIRECTIVE
-struct FglTFRuntimePrimitive : public FGCObject
+template <class T>
+class RelocatableObjectPtr
 {
-	FString GetReferencerName() const override
+public:
+	operator T* () const
 	{
-		return "FglTFRuntimePrimitive";
+		return InternalObjectPtr ? InternalObjectPtr->Object : nullptr;
 	}
 
-	void AddReferencedObjects(FReferenceCollector& Collector) override
+	T* operator=(T* InObject)
 	{
-		Collector.AddReferencedObject(Material);
+		if (!InternalObjectPtr)
+		{
+			InternalObjectPtr = MakeShared<ObjectPtr>();
+		}
+		InternalObjectPtr->Object = InObject;
+		return InObject;
 	}
-#else
+private:
+	class ObjectPtr : FGCObject
+	{
+	public:
+		T* Object = nullptr;
+		void AddReferencedObjects(FReferenceCollector& Collector) override
+		{
+			Collector.AddReferencedObject(Object);
+		}
+
+		FString GetReferencerName() const override
+		{
+			return TEXT("RelocatableObjectPtr::ObjectPtr");
+		}
+	};
+
+	TSharedPtr<ObjectPtr> InternalObjectPtr;
+};
+#endif
+
 struct FglTFRuntimePrimitive
 {
-#endif
 	TArray<FVector> Positions;
 	TArray<FVector> Normals;
 	TArray<FVector4> Tangents;
 	TArray<TArray<FVector2D>> UVs;
 	TArray<uint32> Indices;
+#if 1 // WITH_DIRECTIVE
+	RelocatableObjectPtr<UMaterialInterface> Material;
+#else
 	UMaterialInterface* Material;
+#endif
 	TArray<TArray<FglTFRuntimeUInt16Vector4>> Joints;
 	TArray<TArray<FVector4>> Weights;
 	TArray<FVector4> Colors;
