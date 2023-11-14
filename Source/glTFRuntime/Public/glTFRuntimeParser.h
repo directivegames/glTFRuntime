@@ -1389,9 +1389,16 @@ struct FglTFRuntimeUInt16Vector4
 
 #if 1 // WITH_DIRECTIVE
 template <class T>
-class RelocatableObjectPtr
+class TRelocatableObjectPtr
 {
 public:
+	TRelocatableObjectPtr() = default;
+
+	TRelocatableObjectPtr(T* InObject)
+	{
+		*this = InObject;
+	}
+
 	operator T* () const
 	{
 		return InternalObjectPtr ? InternalObjectPtr->Object : nullptr;
@@ -1434,7 +1441,7 @@ struct FglTFRuntimePrimitive
 	TArray<TArray<FVector2D>> UVs;
 	TArray<uint32> Indices;
 #if 1 // WITH_DIRECTIVE
-	RelocatableObjectPtr<UMaterialInterface> Material;
+	TRelocatableObjectPtr<UMaterialInterface> Material;
 #else
 	UMaterialInterface* Material;
 #endif

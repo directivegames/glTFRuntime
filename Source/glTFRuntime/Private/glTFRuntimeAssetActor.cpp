@@ -447,7 +447,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			auto& CurveBasedAnimationsTimeTracker = AssetComponent->CurveBasedAnimationsTimeTracker;
 			auto& DiscoveredCurveAnimationsNames = AssetComponent->DiscoveredCurveAnimationsNames;
 			auto& DiscoveredCurveAnimations = AssetComponent->DiscoveredCurveAnimations;
-			TMap<FString, TWeakObjectPtr<UglTFRuntimeAnimationCurve>> ComponentAnimationCurvesMap;
+			TMap<FString, TRelocatableObjectPtr<UglTFRuntimeAnimationCurve>> ComponentAnimationCurvesMap;
 #else
 			TArray<UglTFRuntimeAnimationCurve*> ComponentAnimationCurves = Asset->LoadAllNodeAnimationCurves(Node.Index);
 			TMap<FString, UglTFRuntimeAnimationCurve*> ComponentAnimationCurvesMap;

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "glTFRuntimeParser.h"
 
 #include "glTFRuntimeAssetActorComponent.generated.h"
 
@@ -33,5 +34,5 @@ private:
 
 	TSet<FString> DiscoveredCurveAnimationsNames;
 
-	TMap<TWeakObjectPtr<USceneComponent>, TMap<FString, TWeakObjectPtr<UglTFRuntimeAnimationCurve>>> DiscoveredCurveAnimations;
+	TMap<TWeakObjectPtr<USceneComponent>, TMap<FString, TRelocatableObjectPtr<UglTFRuntimeAnimationCurve>>> DiscoveredCurveAnimations;
 };

@@ -49,11 +49,20 @@ void UglTFRuntimeAssetActorComponent::SetCurveAnimationByName(const FString& Cur
 
 	for (auto& Pair : CurveBasedAnimations)
 	{
-		auto WantedCurveAnimationsMap = DiscoveredCurveAnimations[Pair.Key];
+		const auto Component = Pair.Key;
+		if (!Component || !DiscoveredCurveAnimations.Contains(Component))
+		{
+			continue;
+		}
+		auto WantedCurveAnimationsMap = DiscoveredCurveAnimations[Component];
 		if (WantedCurveAnimationsMap.Contains(CurveAnimationName))
 		{
-			Pair.Value = WantedCurveAnimationsMap[CurveAnimationName].Get();
-			CurveBasedAnimationsTimeTracker[Pair.Key] = 0;
+			Pair.Value = WantedCurveAnimationsMap[CurveAnimationName];
+			if (!Pair.Value)
+			{
+				UE_LOG(LogGLTFRuntime, Error, TEXT("Curve animation '%s' for '%s' is no longer in memory"), *CurveAnimationName, *Component->GetPathName());
+			}
+			CurveBasedAnimationsTimeTracker[Component] = 0;
 		}
 		else
 		{
