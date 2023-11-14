@@ -408,6 +408,7 @@ AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldC
 				SceneComponent->SetupAttachment(Actor->GetRootComponent());
 				SceneComponent->SetRelativeTransform(RelativeTransform);
 				SceneComponent->RegisterComponent();
+				Actor->AddInstanceComponent(SceneComponent);
 				TempActor->DelegateRootComponent = SceneComponent;
 			}
 			TempActor->StaticMeshConfig = StaticMeshConfig;
