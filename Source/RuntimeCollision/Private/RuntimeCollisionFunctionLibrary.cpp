@@ -54,7 +54,14 @@ static bool PrepareStaticMeshForCollisionGeneration(UStaticMesh* StaticMesh, TAr
 		{
 			for (uint32 IndexIdx = Section.FirstIndex; IndexIdx < Section.FirstIndex + (Section.NumTriangles * 3); IndexIdx++)
 			{
-				Indices.Add(AllIndices[IndexIdx]);
+				if (ensure(AllIndices.IsValidIndex(IndexIdx)))
+				{
+					Indices.Add(AllIndices[IndexIdx]);
+				}
+				else
+				{
+					return false;
+				}
 			}
 		}
 	}
