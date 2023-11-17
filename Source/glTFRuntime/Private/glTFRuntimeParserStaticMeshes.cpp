@@ -747,14 +747,18 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 		auto bHasConvexCollision = false;
 		if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
 		{
-			if (StaticMeshConfig.bGenerateStaticMeshDescription)
+			if (!StaticMeshConfig.bGenerateStaticMeshDescription)
 			{
-				const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
-				bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
+				AddError("FinalizeStaticMesh", "Unable to generate convex collision without enabling FglTFRuntimeStaticMeshConfig::bGenerateStaticMeshDescription");
+			}
+			else if (!StaticMeshConfig.bAllowCPUAccess)
+			{
+				AddError("FinalizeStaticMesh", "Unable to generate convex collision without enabling FglTFRuntimeStaticMeshConfig::bAllowCPUAccess");
 			}
 			else
 			{
-				AddError("FinalizeStaticMesh", "Unable to generate convex collision without FglTFRuntimeStaticMeshConfig::bGenerateStaticMeshDescription = true!");
+				const auto& Config = StaticMeshConfig.ConvexCollisionConfig;
+				bHasConvexCollision = URuntimeCollisionFunctionLibrary::GenerateConvexCollisionForStaticMesh(StaticMesh, Config.HullCount, Config.MaxHullVerts, Config.HullPrecision);
 			}
 		}
 
@@ -962,6 +966,13 @@ TArray<UStaticMesh*> FglTFRuntimeParser::LoadStaticMeshesFromPrimitives(const in
 
 UStaticMesh* FglTFRuntimeParser::LoadStaticMeshLODs(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
 {
+#if 1 // WITH_DIRECTIVE
+	if (MeshIndices.Num() == 1)
+	{
+		// when there's only 1 LOD to load, use "LoadStaticMesh" which implements mesh caching
+		return LoadStaticMesh(MeshIndices[0], StaticMeshConfig);
+	}
+#endif
 
 	TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext = MakeShared<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>(AsShared(), StaticMeshConfig);
 
