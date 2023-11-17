@@ -646,7 +646,12 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 
 	UStaticMesh* StaticMesh = StaticMeshContext->StaticMesh;
 	FStaticMeshRenderData* RenderData = StaticMeshContext->RenderData;
+
+#if 1 // WITH_DIRECTIVE
+	auto StaticMeshConfig = StaticMeshContext->StaticMeshConfig;
+#else
 	const FglTFRuntimeStaticMeshConfig& StaticMeshConfig = StaticMeshContext->StaticMeshConfig;
+#endif
 
 #if ENGINE_MAJOR_VERSION > 4 || (ENGINE_MINOR_VERSION > 26)
 	StaticMesh->SetStaticMaterials(StaticMeshContext->StaticMaterials);
@@ -703,6 +708,41 @@ UStaticMesh* FglTFRuntimeParser::FinalizeStaticMesh(TSharedRef<FglTFRuntimeStati
 	BodySetup->CollisionTraceFlag = StaticMeshConfig.CollisionComplexity;
 
 	BodySetup->InvalidatePhysicsData();
+
+#if 1 // WITH_DIRECTIVE
+	if (StaticMeshConfig.ConvexCollisionConfig.bGenerateConvexCollision)
+	{
+		if (StaticMeshConfig.bBuildSimpleCollision)
+		{
+			StaticMeshConfig.bBuildSimpleCollision = false;
+			AddError("FinalizeStaticMesh", "force disabling bBuildSimpleCollision because bGenerateConvexCollision is on!");
+		}
+
+		if (StaticMeshConfig.bBuildComplexCollision)
+		{
+			StaticMeshConfig.bBuildComplexCollision = false;
+			AddError("FinalizeStaticMesh", "force disabling bBuildComplexCollision because bGenerateConvexCollision is on!");
+		}
+
+		if (StaticMeshConfig.CollisionComplexity == ECollisionTraceFlag::CTF_UseComplexAsSimple)
+		{
+			StaticMeshConfig.CollisionComplexity = ECollisionTraceFlag::CTF_UseDefault;
+			AddError("FinalizeStaticMesh", "force setting CollisionComplexity = CTF_UseDefault because bGenerateConvexCollision is on!");
+		}
+
+		if (StaticMeshConfig.BoxCollisions.Num())
+		{
+			StaticMeshConfig.BoxCollisions = {};
+			AddError("FinalizeStaticMesh", "force clearing BoxCollisions because bGenerateConvexCollision is on!");
+		}
+
+		if (StaticMeshConfig.SphereCollisions.Num())
+		{
+			StaticMeshConfig.SphereCollisions = {};
+			AddError("FinalizeStaticMesh", "force clearing SphereCollisions because bGenerateConvexCollision is on!");
+		}
+	}
+#endif
 
 	if (StaticMeshConfig.bBuildSimpleCollision)
 	{
