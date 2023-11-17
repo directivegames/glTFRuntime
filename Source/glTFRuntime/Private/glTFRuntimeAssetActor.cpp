@@ -204,20 +204,11 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		{
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(AddStaticMeshComponent);
-#endif
 			UStaticMeshComponent* StaticMeshComponent = nullptr;
 			TArray<FTransform> GPUInstancingTransforms;
 			if (Asset->GetNodeGPUInstancingTransforms(Node.Index, GPUInstancingTransforms))
 			{
-#if 1 // WITH_DIRECTIVE
 				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(GetComponentOwner(), GetSafeNodeName<UInstancedStaticMeshComponent>(Node));
-				if (StaticMeshConfig.bSetNetAddressable)
-				{
-					InstancedStaticMeshComponent->SetNetAddressable();
-				}
-#else
-				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(this, GetSafeNodeName<UInstancedStaticMeshComponent>(Node));
-#endif
 				for (const FTransform& GPUInstanceTransform : GPUInstancingTransforms)
 				{
 					InstancedStaticMeshComponent->AddInstance(GPUInstanceTransform);
@@ -226,15 +217,43 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			}
 			else
 			{
-#if 1 // WITH_DIRECTIVE
 				StaticMeshComponent = NewObject<UStaticMeshComponent>(GetComponentOwner(), GetSafeNodeName<UStaticMeshComponent>(Node));
-				if (StaticMeshConfig.bSetNetAddressable)
+			}
+			if (!NodeParentComponent)
+			{
+				SetRootComponent(StaticMeshComponent);
+			}
+			else
+			{
+				StaticMeshComponent->SetupAttachment(NodeParentComponent);
+			}
+
+			if (StaticMeshConfig.bSetNetAddressable)
+			{
+				StaticMeshComponent->SetNetAddressable();
+			}
+
+			StaticMeshComponent->RegisterComponent();
+			auto NodeTransform = Node.Transform;
+			NodeTransform.SetScale3D(NodeTransform.GetScale3D() / StaticMeshConfig.DefaultMeshScale);
+			StaticMeshComponent->SetRelativeTransform(NodeTransform);
+			CustomAddInstanceComponent(StaticMeshComponent);
+			FglTFRuntimeParser::AddStaticMeshComponentReference(StaticMeshComponent);
+#else
+			UStaticMeshComponent* StaticMeshComponent = nullptr;
+			TArray<FTransform> GPUInstancingTransforms;
+			if (Asset->GetNodeGPUInstancingTransforms(Node.Index, GPUInstancingTransforms))
+			{
+				UInstancedStaticMeshComponent* InstancedStaticMeshComponent = NewObject<UInstancedStaticMeshComponent>(this, GetSafeNodeName<UInstancedStaticMeshComponent>(Node));
+				for (const FTransform& GPUInstanceTransform : GPUInstancingTransforms)
 				{
-					StaticMeshComponent->SetNetAddressable();
+					InstancedStaticMeshComponent->AddInstance(GPUInstanceTransform);
 				}
-#else				
+				StaticMeshComponent = InstancedStaticMeshComponent;
+			}
+			else
+			{
 				StaticMeshComponent = NewObject<UStaticMeshComponent>(this, GetSafeNodeName<UStaticMeshComponent>(Node));
-#endif
 			}
 
 			if (!NodeParentComponent)
@@ -245,28 +264,14 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			{
 				StaticMeshComponent->SetupAttachment(NodeParentComponent);
 			}
-			StaticMeshComponent->RegisterComponent();			
-
-#if 1 // WITH_DIRECTIVE
-			auto NodeTransform = Node.Transform;
-			NodeTransform.SetScale3D(NodeTransform.GetScale3D() / StaticMeshConfig.DefaultMeshScale);
-			StaticMeshComponent->SetRelativeTransform(NodeTransform);
-			CustomAddInstanceComponent(StaticMeshComponent);
-			FglTFRuntimeParser::AddStaticMeshComponentReference(StaticMeshComponent);
-#else
+			StaticMeshComponent->RegisterComponent();
 			StaticMeshComponent->SetRelativeTransform(Node.Transform);
 			AddInstanceComponent(StaticMeshComponent);
-#endif
-
-#if 0 // WITH_DIRECTIVE
-			// The loaded static mesh might be cached somewhere for re-use
-			// so we shouldn't set its outer to the static mesh component, which would prevent the latter to be garbage collected!
 			if (StaticMeshConfig.Outer == nullptr)
 			{
 				StaticMeshConfig.Outer = StaticMeshComponent;
 			}
 #endif
-
 			TArray<int32> MeshIndices;
 			MeshIndices.Add(Node.MeshIndex);
 
