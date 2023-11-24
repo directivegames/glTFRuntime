@@ -53,5 +53,12 @@ public:
 									  const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
 									  const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
 									  const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig);
+
+	// Same as glTFSpawnAssetOnActor but allows the AglTFRuntimeAssetActor to be configured via the callback before the assets are loaded
+	static AActor* glTFSpawnAssetOnActor2(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+										const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
+										const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
+										const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig,
+										TFunction<void(class AglTFRuntimeAssetActor*)> PreSpawnConfiguration = nullptr);
 #endif
 };

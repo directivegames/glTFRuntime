@@ -382,9 +382,18 @@ TArray<FglTFRuntimePathItem> UglTFRuntimeFunctionLibrary::glTFRuntimePathItemArr
 
 #if 1 // WITH_DIRECTIVE
 AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+	const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
+	const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
+	const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	return glTFSpawnAssetOnActor2(WorldContextObject, Asset, Actor, RelativeTransform, StaticMeshConfig, SkeletalMeshConfig, SkeletalAnimationConfig);
+}
+
+AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor2(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
 														const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
 														const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
-														const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+														const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig,
+														TFunction<void(AglTFRuntimeAssetActor*)> PreSpawnConfiguration)
 {
 	if (ensure(WorldContextObject && Asset))
 	{
@@ -414,6 +423,10 @@ AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldC
 			TempActor->StaticMeshConfig = StaticMeshConfig;
 			TempActor->SkeletalMeshConfig = SkeletalMeshConfig;
 			TempActor->SkeletalAnimationConfig = SkeletalAnimationConfig;
+			if (PreSpawnConfiguration)
+			{
+				PreSpawnConfiguration(TempActor);
+			}
 			TempActor->FinishSpawning(FTransform::Identity);
 
 			if (Actor != TempActor)
