@@ -198,7 +198,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	else
 	{
 #if 1 // WITH_DIRECTIVE
-		UE_LOG(LogGLTFRuntime, Log, TEXT("ProcessNode: %s with transform [%s]"), *Node.Name, *Node.Transform.ToString());
+		UE_LOG(LogGLTFRuntime, Verbose, TEXT("ProcessNode: %s with transform [%s]"), *Node.Name, *Node.Transform.ToString());
 #endif
 		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
 		{
