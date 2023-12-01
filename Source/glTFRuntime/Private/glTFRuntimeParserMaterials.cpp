@@ -315,7 +315,7 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 	TRACE_CPUPROFILER_EVENT_SCOPE(FglTFRuntimeParser::BuildTexture);
 	LLM_SCOPE((ELLMTag)EglTFRuntimeLLMTag::BuildTexture);
 	UTexture2D* Texture = NewObject<UTexture2D>(GetTransientPackage(), NAME_None, RF_Public);
-	UE_LOG(LogGLTFRuntime, Log, TEXT("FglTFRuntimeParser::BuildTexture: created texture of size %dx%d at index %d"),
+	UE_LOG(LogGLTFRuntime, Verbose, TEXT("FglTFRuntimeParser::BuildTexture: created texture of size %dx%d at index %d"),
 		Mips[0].Width, Mips[0].Height, Mips[0].TextureIndex);
 #else
 	UTexture2D* Texture = NewObject<UTexture2D>(Outer, NAME_None, RF_Public);
@@ -361,7 +361,13 @@ UTexture2D* FglTFRuntimeParser::BuildTexture(UObject* Outer, const TArray<FglTFR
 
 #if !WITH_EDITOR
 		// this is a hack for allowing texture streaming without messing around with deriveddata
+
+#if 0 // WITH_DIRECTIVE
+		// this doesn't seem to be needed and it causes annoying log error "Loading non-streamed mips from an external bulk file."
+		// in FTexturePlatformData::TryLoadMipsWithSizes
 		Mip->BulkData.SetBulkDataFlags(BULKDATA_PayloadInSeperateFile);
+#endif
+
 #endif
 		Mip->BulkData.Lock(LOCK_READ_WRITE);
 
