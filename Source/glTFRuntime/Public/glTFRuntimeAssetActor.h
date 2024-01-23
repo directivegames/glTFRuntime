@@ -31,11 +31,29 @@ protected:
 	TMap<USceneComponent*, TMap<FString, UglTFRuntimeAnimationCurve*>> DiscoveredCurveAnimations;
 #endif
 
+#if 1 // WITH_DIRECTIVE
+	int32 NameIndex = 1000;
+
+	template<typename T>
+	FName GetSafeNodeName(const FglTFRuntimeNode& Node)
+	{
+		if (Guid.IsValid())
+		{
+			FString BaseName = Node.Name + TEXT("_") + Guid.ToString();
+			NameIndex += 1;
+
+			return FName(BaseName, NameIndex);
+		}
+		
+		return MakeUniqueObjectName(this, T::StaticClass(), *Node.Name);
+	}
+#else
 	template<typename T>
 	FName GetSafeNodeName(const FglTFRuntimeNode& Node)
 	{
 		return MakeUniqueObjectName(this, T::StaticClass(), *Node.Name);
 	}
+#endif
 
 	TMap<USceneComponent*, FName> SocketMapping;
 	TArray<USkeletalMeshComponent*> DiscoveredSkeletalMeshComponents;
@@ -57,6 +75,8 @@ public:
 	// If specified, newly created components will be attached to the delegate root
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
 	TObjectPtr<USceneComponent> DelegateRootComponent;
+
+	FGuid Guid;
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Meta = (ExposeOnSpawn = true), Category = "glTFRuntime")
