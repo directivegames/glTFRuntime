@@ -322,6 +322,11 @@ void UglTFRuntimeAsset::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32
 
 	Parser->LoadSkeletalMeshAsync(MeshIndex, SkinIndex, AsyncCallback, SkeletalMeshConfig);
 }
+#else
+void UglTFRuntimeAsset::LoadSkeletalMeshAsync(const int32 MeshIndex, const int32 SkinIndex, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
+}
 #endif
 
 USkeletalMesh* UglTFRuntimeAsset::LoadSkeletalMeshRecursive(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
@@ -345,6 +350,19 @@ void UglTFRuntimeAsset::LoadStaticMeshRecursiveAsync(const FString& NodeName, co
 
 	Parser->LoadStaticMeshRecursiveAsync(NodeName, ExcludeNodes, AsyncCallback, StaticMeshConfig);
 }
+
+#else
+
+void UglTFRuntimeAsset::LoadSkeletalMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeSkeletalMeshAsync& AsyncCallback, const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig, const EglTFRuntimeRecursiveMode TransformApplyRecursiveMode)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
+}
+
+void UglTFRuntimeAsset::LoadStaticMeshRecursiveAsync(const FString& NodeName, const TArray<FString>& ExcludeNodes, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
+}
+
 #endif
 
 USkeleton* UglTFRuntimeAsset::LoadSkeleton(const int32 SkinIndex, const FglTFRuntimeSkeletonConfig& SkeletonConfig)
@@ -618,6 +636,19 @@ void UglTFRuntimeAsset::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices
 	GLTF_CHECK_PARSER_VOID();
 
 	Parser->LoadStaticMeshLODsAsync(MeshIndices, AsyncCallback, StaticMeshConfig);
+}
+#else
+void UglTFRuntimeAsset::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
+}
+void UglTFRuntimeAsset::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
+}
+void UglTFRuntimeAsset::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndices, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
 }
 #endif
 
@@ -1401,6 +1432,11 @@ void UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRun
 	GLTF_CHECK_PARSER_VOID();
 
 	Parser->LoadStaticMeshFromRuntimeLODsAsync(RuntimeLODs, AsyncCallback, StaticMeshConfig);
+}
+#else
+void UglTFRuntimeAsset::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRuntimeMeshLOD>& RuntimeLODs, const FglTFRuntimeStaticMeshAsync& AsyncCallback, const FglTFRuntimeStaticMeshConfig& StaticMeshConfig)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
 }
 #endif
 

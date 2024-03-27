@@ -13,7 +13,6 @@ class GLTFRUNTIME_API AglTFRuntimeAssetActorAsync : public AActor
 {
 	GENERATED_BODY()
 
-#if 0 // WITH_DIRECTIVE
 public:	
 	// Sets default values for this actor's properties
 	AglTFRuntimeAssetActorAsync();
@@ -76,5 +75,4 @@ private:
 	UPrimitiveComponent* CurrentPrimitiveComponent;
 
 	double LoadingStartTime;
-#endif
 };

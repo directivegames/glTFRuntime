@@ -6,7 +6,6 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshSocket.h"
 
-#if WITH_ASYNC_API // WITH_DIRECTIVE
 // Sets default values
 AglTFRuntimeAssetActorAsync::AglTFRuntimeAssetActorAsync()
 {
@@ -269,4 +268,3 @@ void AglTFRuntimeAssetActorAsync::PostUnregisterAllComponents()
 	}
 	Super::PostUnregisterAllComponents();
 }
-#endif

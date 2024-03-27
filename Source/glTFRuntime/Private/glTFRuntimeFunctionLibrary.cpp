@@ -117,6 +117,11 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(UObject* WorldC
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
 }
+#else
+void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(UObject* WorldContextObject, const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
+{
+	ensureAlwaysMsgf(false, TEXT("Async API is not enabled!"));
+}
 #endif
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(UObject* WorldContextObject, const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
