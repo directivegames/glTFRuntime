@@ -58,6 +58,7 @@ UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilename(UObjec
 	return Asset;
 }
 
+#if WITH_ASYNC_API // WITH_DIRECTIVE
 void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(UObject* WorldContextObject, const FString& Filename, const bool bPathRelativeToContent, const FglTFRuntimeConfig& LoaderConfig, const FglTFRuntimeHttpResponse& Completed)
 {
 #if 1 // WITH_DIRECTIVE
@@ -116,6 +117,7 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromFilenameAsync(UObject* WorldC
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});
 }
+#endif
 
 UglTFRuntimeAsset* UglTFRuntimeFunctionLibrary::glTFLoadAssetFromString(UObject* WorldContextObject, const FString& JsonData, const FglTFRuntimeConfig& LoaderConfig)
 {

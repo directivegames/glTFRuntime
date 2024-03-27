@@ -5085,6 +5085,7 @@ bool FglTFRuntimeParser::GetBlobByName(const FString& Name, TArray64<uint8>& Blo
 	return ZipFile->GetFileContent(Name, Blob);
 }
 
+#if WITH_ASYNC_API // WITH_DIRECTIVE
 void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const FglTFRuntimeMeshLODAsync& AsyncCallback, const FglTFRuntimeMaterialsConfig& MaterialsConfig)
 {
 	TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
@@ -5106,6 +5107,7 @@ void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const 
 
 	);
 }
+#endif
 
 bool FglTFRuntimeParser::LoadPathToBlob(const FString& Path, TArray64<uint8>& Blob)
 {
