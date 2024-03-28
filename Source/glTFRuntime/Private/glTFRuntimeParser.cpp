@@ -5096,6 +5096,9 @@ void FglTFRuntimeParser::LoadMeshAsRuntimeLODAsync(const int32 MeshIndex, const 
 
 	Async(EAsyncExecution::Thread, [this, JsonMeshObject, MaterialsConfig, AsyncCallback]()
 		{
+#if 1 // WITH_DIRECTIVE
+			GLTF_ASYNC_LOCK
+#endif
 			FglTFRuntimeMeshLOD* LOD;
 			bool bSuccess = LoadMeshIntoMeshLOD(JsonMeshObject.ToSharedRef(), LOD, MaterialsConfig);
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([bSuccess, LOD, AsyncCallback]()

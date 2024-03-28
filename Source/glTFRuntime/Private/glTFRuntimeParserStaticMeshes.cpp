@@ -112,7 +112,9 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 
 	Async(EAsyncExecution::Thread, [this, StaticMeshContext, MeshIndex, AsyncCallback]()
 		{
-
+#if 1 // WITH_DIRECTIVE
+			GLTF_ASYNC_LOCK
+#endif
 			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 			if (JsonMeshObject)
 			{
@@ -1050,6 +1052,9 @@ void FglTFRuntimeParser::LoadStaticMeshLODsAsync(const TArray<int32>& MeshIndice
 
 	Async(EAsyncExecution::Thread, [this, StaticMeshContext, MeshIndices, AsyncCallback]()
 		{
+#if 1 // WITH_DIRECTIVE
+			GLTF_ASYNC_LOCK
+#endif
 			bool bSuccess = true;
 			for (const int32 MeshIndex : MeshIndices)
 			{
@@ -1281,7 +1286,9 @@ void FglTFRuntimeParser::LoadStaticMeshRecursiveAsync(const FString& NodeName, c
 
 	Async(EAsyncExecution::Thread, [this, StaticMeshContext, StaticMeshConfig, ExcludeNodes, NodeName, AsyncCallback]()
 		{
-
+#if 1 // WITH_DIRECTIVE
+			GLTF_ASYNC_LOCK
+#endif
 			FglTFRuntimeNode Node;
 			TArray<FglTFRuntimeNode> Nodes;
 
@@ -1426,6 +1433,9 @@ void FglTFRuntimeParser::LoadStaticMeshFromRuntimeLODsAsync(const TArray<FglTFRu
 
 	Async(EAsyncExecution::Thread, [this, StaticMeshContext, StaticMeshConfig, RuntimeLODs, AsyncCallback]()
 		{
+#if 1 // WITH_DIRECTIVE
+			GLTF_ASYNC_LOCK
+#endif
 			for (const FglTFRuntimeMeshLOD& RuntimeLOD : RuntimeLODs)
 			{
 				StaticMeshContext->LODs.Add(&RuntimeLOD);
