@@ -66,7 +66,7 @@ public class glTFRuntime : ModuleRules
 
 #if true // WITH_DIRECTIVE
         PrivateDependencyModuleNames.Add("RuntimeCollision");
-        PublicDefinitions.Add("WITH_ASYNC_API=0");
+        PublicDefinitions.Add("WITH_ASYNC_API=1");
 #else
         PublicDefinitions.Add("WITH_ASYNC_API=1");
 #endif
