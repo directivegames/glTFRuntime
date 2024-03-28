@@ -2807,9 +2807,6 @@ public:
 	{
 		Async(EAsyncExecution::Thread, [Function, AsyncCallback]()
 			{
-#if 1 // WITH_DIRECTIVE
-				GLTF_ASYNC_LOCK
-#endif
 				FglTFRuntimeMeshLOD LOD;
 				bool bSuccess = Function(LOD);
 				FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([bSuccess, &LOD, AsyncCallback]()
