@@ -108,12 +108,25 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 		return;
 	}
 
+#if 1 // WITH_DIRECTIVE
+	auto& PendingCallbacks = PendingStaticMeshAsyncCallbacks.FindOrAdd(MeshIndex);
+	if (PendingCallbacks.IsBound())
+	{
+		PendingCallbacks.AddUnique(AsyncCallback);
+		return;
+	}
+	PendingCallbacks.Add(AsyncCallback);
+#endif
+
 	TSharedRef<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe> StaticMeshContext = MakeShared<FglTFRuntimeStaticMeshContext, ESPMode::ThreadSafe>(AsShared(), StaticMeshConfig);
 
+#if 1 // WITH_DIRECTIVE
+	Async(EAsyncExecution::Thread, [this, StaticMeshContext, MeshIndex]()
+		{
+			GLTF_ASYNC_LOCK
+#else
 	Async(EAsyncExecution::Thread, [this, StaticMeshContext, MeshIndex, AsyncCallback]()
 		{
-#if 1 // WITH_DIRECTIVE
-			GLTF_ASYNC_LOCK
 #endif
 			TSharedPtr<FJsonObject> JsonMeshObject = GetJsonObjectFromRootIndex("meshes", MeshIndex);
 			if (JsonMeshObject)
@@ -128,7 +141,11 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 				}
 			}
 
+#if 1 // WITH_DIRECTIVE
+			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([MeshIndex, StaticMeshContext]()
+#else
 			FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady([MeshIndex, StaticMeshContext, AsyncCallback]()
+#endif
 				{
 					if (StaticMeshContext->StaticMesh)
 					{
@@ -143,7 +160,12 @@ void FglTFRuntimeParser::LoadStaticMeshAsync(const int32 MeshIndex, const FglTFR
 						}
 					}
 
+#if 1 // WITH_DIRECTIVE
+					const auto& PendingCallbacks = StaticMeshContext->Parser->PendingStaticMeshAsyncCallbacks.FindOrAdd(MeshIndex);
+					PendingCallbacks.Broadcast(StaticMeshContext->StaticMesh);
+#else
 					AsyncCallback.ExecuteIfBound(StaticMeshContext->StaticMesh);
+#endif
 				}, TStatId(), nullptr, ENamedThreads::GameThread);
 			FTaskGraphInterface::Get().WaitUntilTaskCompletes(Task);
 		});

@@ -2851,6 +2851,7 @@ public:
 
 #if 1 // WITH_DIRECTIVE
 	FCriticalSection AsyncLock;
+	TMap<int32, FglTFRuntimeStaticMeshAsyncCallbacks> PendingStaticMeshAsyncCallbacks; // StaticMeshIndex -> Callbacks
 #endif
 };
 
