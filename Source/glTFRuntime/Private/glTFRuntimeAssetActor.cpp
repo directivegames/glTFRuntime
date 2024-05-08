@@ -31,6 +31,9 @@ AglTFRuntimeAssetActor::AglTFRuntimeAssetActor()
 	bAllowLights = true;
 	bForceSkinnedMeshToRoot = false;
 	RootNodeIndex = INDEX_NONE;
+	bLoadAllSkeletalAnimations = false;
+	bAutoPlayAnimations = true;
+	bStaticMeshesAsSkeletalOnMorphTargets = true;
 }
 
 // Called when the game starts or when spawned
@@ -159,7 +162,6 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 		NewCameraComponent->SetRelativeTransform(Node.Transform);
 		AddInstanceComponent(NewCameraComponent);
 #endif
-
 		Asset->LoadCamera(Node.CameraIndex, NewCameraComponent);
 		NewComponent = NewCameraComponent;
 
@@ -200,7 +202,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 #if 1 // WITH_DIRECTIVE
 		UE_LOG(LogGLTFRuntime, Verbose, TEXT("ProcessNode: %s with transform [%s]"), *Node.Name, *Node.Transform.ToString());
 #endif
-		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal)
+		if (Node.SkinIndex < 0 && !bStaticMeshesAsSkeletal && !(bStaticMeshesAsSkeletalOnMorphTargets && Asset->MeshHasMorphTargets(Node.MeshIndex)))
 		{
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(AddStaticMeshComponent);
@@ -272,6 +274,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 				StaticMeshConfig.Outer = StaticMeshComponent;
 			}
 #endif
+
 			TArray<int32> MeshIndices;
 			MeshIndices.Add(Node.MeshIndex);
 
@@ -381,6 +384,7 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 			DiscoveredSkeletalMeshComponents.Add(SkeletalMeshComponent);
 			ReceiveOnSkeletalMeshComponentCreated(SkeletalMeshComponent, Node);
 			NewComponent = SkeletalMeshComponent;
+
 #if 1 // WITH_DIRECTIVE
 			SkeletalMeshConfig.SkeletalMeshComponentProcessor.ExecuteIfBound(SkeletalMeshComponent);
 #endif
@@ -393,8 +397,8 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 	}
 	else
 	{
-		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeName:%s"), *Node.Name));
-		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("GLTFRuntime:NodeIndex:%d"), Node.Index));
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeName:%s"), *Node.Name));
+		NewComponent->ComponentTags.Add(*FString::Printf(TEXT("glTFRuntime:NodeIndex:%d"), Node.Index));
 
 		if (SocketName != NAME_None)
 		{
@@ -478,29 +482,56 @@ void AglTFRuntimeAssetActor::ProcessNode(USceneComponent* NodeParentComponent, c
 #if 1 // WITH_DIRECTIVE
 			TRACE_CPUPROFILER_EVENT_SCOPE(LoadSkeletalAnimations);
 #endif
-
+			UAnimSequence* SkeletalAnimation = nullptr;
+			if (bLoadAllSkeletalAnimations)
+			{
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
-			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
-			if (!SkeletalAnimation && bAllowPoseAnimations)
-			{
-				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
-			}
+				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
 #else
-			UAnimSequence* SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+				TMap<FString, UAnimSequence*> SkeletalAnimationsMap = Asset->LoadNodeSkeletalAnimationsMap(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+#endif
+				if (SkeletalAnimationsMap.Num() > 0)
+				{
+					DiscoveredSkeletalAnimations.Add(SkeletalMeshComponent, SkeletalAnimationsMap);
+					
+					for (const TPair<FString, UAnimSequence*>& Pair : SkeletalAnimationsMap)
+					{
+						AllSkeletalAnimations.Add(Pair.Value);
+						// set the first animation (TODO: allow this to be configurable)
+						if (!SkeletalAnimation)
+						{
+							SkeletalAnimation = Pair.Value;
+						}
+					}
+				}
+			}
+			else
+			{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
+				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->GetSkeletalMeshAsset(), Node.Index, SkeletalAnimationConfig);
+#else
+				SkeletalAnimation = Asset->LoadNodeSkeletalAnimation(SkeletalMeshComponent->SkeletalMesh, Node.Index, SkeletalAnimationConfig);
+#endif
+			}
+
 			if (!SkeletalAnimation && bAllowPoseAnimations)
 			{
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION > 0
+				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->GetSkeletalMeshAsset(), SkeletalAnimationConfig, Node.SkinIndex);
+#else
 				SkeletalAnimation = Asset->CreateAnimationFromPose(SkeletalMeshComponent->SkeletalMesh, SkeletalAnimationConfig, Node.SkinIndex);
-			}
 #endif
+			}
+
 			if (SkeletalAnimation)
 			{
 				SkeletalMeshComponent->AnimationData.AnimToPlay = SkeletalAnimation;
 				SkeletalMeshComponent->AnimationData.bSavedLooping = true;
-				SkeletalMeshComponent->AnimationData.bSavedPlaying = true;
+				SkeletalMeshComponent->AnimationData.bSavedPlaying = bAutoPlayAnimations;
 				SkeletalMeshComponent->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 			}
+		}
 	}
-}
 
 	OnNodeProcessed.Broadcast(Node, NewComponent);
 
@@ -538,6 +569,7 @@ void AglTFRuntimeAssetActor::SetCurveAnimationByName(const FString& CurveAnimati
 		}
 
 	}
+
 }
 #endif
 
@@ -593,6 +625,30 @@ void AglTFRuntimeAssetActor::PostUnregisterAllComponents()
 		Asset = nullptr;
 	}
 	Super::PostUnregisterAllComponents();
+}
+
+UAnimSequence* AglTFRuntimeAssetActor::GetSkeletalAnimationByName(USkeletalMeshComponent* SkeletalMeshComponent, const FString& AnimationName) const
+{
+	if (!SkeletalMeshComponent)
+	{
+		return nullptr;
+	}
+
+	if (!DiscoveredSkeletalAnimations.Contains(SkeletalMeshComponent))
+	{
+		return nullptr;
+	}
+
+	for (const TPair<FString, UAnimSequence*>& Pair : DiscoveredSkeletalAnimations[SkeletalMeshComponent])
+	{
+		if (Pair.Key == AnimationName)
+		{
+			SkeletalMeshComponent->AnimationData.AnimToPlay = Pair.Value;
+			return Pair.Value;
+		}
+	}
+
+	return nullptr;
 }
 
 #if 1 // WITH_DIRECTIVE

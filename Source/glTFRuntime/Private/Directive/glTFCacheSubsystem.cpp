@@ -33,6 +33,11 @@ UglTFRuntimeAsset* UglTFCacheSubsystem::GetCachedAsset(const FString& Key) const
 
 void UglTFCacheSubsystem::CacheAsset(UObject* WorldContextObject, const FString& Key, UglTFRuntimeAsset* Asset)
 {
+	if (!Asset)
+	{
+		return;
+	}
+
 	if (auto Sub = Cast<UglTFCacheSubsystem>(USubsystemBlueprintLibrary::GetGameInstanceSubsystem(WorldContextObject, UglTFCacheSubsystem::StaticClass())))
 	{
 		Sub->CacheAsset(Key, Asset);

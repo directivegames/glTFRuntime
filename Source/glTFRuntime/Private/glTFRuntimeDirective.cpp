@@ -4,7 +4,7 @@
 
 #define SORT_ANIM_POINTS 0
 
-const TArray<TSharedPtr<FJsonValue>>* FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index)
+const TArray<TSharedPtr<FJsonValue>>* FglTFRuntimeParser::CheckJsonIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index) const
 {
 	if (Index < 0)
 	{
@@ -26,7 +26,7 @@ const TArray<TSharedPtr<FJsonValue>>* FglTFRuntimeParser::CheckJsonIndex(TShared
 	return JsonArray;
 }
 
-TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index)
+TSharedPtr<FJsonObject> FglTFRuntimeParser::GetJsonObjectFromIndex(TSharedRef<FJsonObject> JsonObject, const FString& FieldName, const int32 Index) const
 {
 	if (auto JsonArray = CheckJsonIndex(JsonObject, FieldName, Index))
 	{
@@ -246,7 +246,7 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 	}
 
 	const FTransform OriginalTransform = FTransform(SceneBasis * Node.Transform.ToMatrixWithScale() * SceneBasis.Inverse());
-	TArray<UglTFRuntimeAnimationCurve*> AnimationCurves;
+	TArray<TObjectPtr<UglTFRuntimeAnimationCurve>> AnimationCurves;
 
 	for (int32 JsonAnimationIndex = 0; JsonAnimationIndex < JsonAnimations->Num(); JsonAnimationIndex++)
 	{
@@ -270,7 +270,7 @@ TArray<UglTFRuntimeAnimationCurve*> FglTFRuntimeParser::LoadAllNodeAnimationCurv
 		FString Name;
 		auto bAnimationFound = false;
 		auto AnimationCurve = NewObject<UglTFRuntimeAnimationCurve>(GetTransientPackage(), NAME_None, RF_Public);
-		AnimationCurve->SetDefaultValues(OriginalTransform.GetLocation(), OriginalTransform.Rotator().Euler(), OriginalTransform.GetScale3D());
+		AnimationCurve->SetDefaultValues(OriginalTransform.GetLocation(), OriginalTransform.GetRotation(), OriginalTransform.GetRotation().Rotator(), OriginalTransform.GetScale3D());
 
 		const auto Callback = [&](const FglTFRuntimeNode& Node, const FString& Path, const FglTFRuntimeAnimationCurve& Curve)
 		{			
@@ -412,7 +412,7 @@ void UglTFRuntimeAnimationCurve::AddLocationValues(const TArray<FglTFRuntimeCurv
 
 void UglTFRuntimeAnimationCurve::AddRotationValues(const TArray<FglTFRuntimeCurvePoint>& Points, ERichCurveInterpMode InterpolationMode)
 {
-	PopulateCurves(RotationCurves, Points, InterpolationMode, true);
+	PopulateCurves(RotatorCurves, Points, InterpolationMode, true);
 }
 
 void UglTFRuntimeAnimationCurve::AddScaleValues(const TArray<FglTFRuntimeCurvePoint>& Points, ERichCurveInterpMode InterpolationMode)
