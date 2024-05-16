@@ -48,7 +48,7 @@ private:
 	bool DoGenerateCollisionForStaticMesh(UStaticMesh* InStaticMesh, int32 HullCount, int32 MaxHullVerts, int32 HullPrecision, FOnConvexCollisionGenerationFinished InCallback);
 
 private:
-	UStaticMesh* StaticMesh = nullptr;
+	TObjectPtr<UStaticMesh> StaticMesh = nullptr;
 	IDecomposeMeshToHullsAsync* Task = nullptr;
 	double BeginTime = 0.f;
 	FOnConvexCollisionGenerationFinished Callback;
