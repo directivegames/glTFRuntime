@@ -785,3 +785,64 @@ void UglTFRuntimeFunctionLibrary::glTFLoadAssetFromCommand(const FString& Comman
 		});
 
 }
+
+#if 1 // WITH_DIRECTIVE
+AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+	const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
+	const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
+	const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig)
+{
+	return glTFSpawnAssetOnActor2(WorldContextObject, Asset, Actor, RelativeTransform, StaticMeshConfig, SkeletalMeshConfig, SkeletalAnimationConfig);
+}
+
+AActor* UglTFRuntimeFunctionLibrary::glTFSpawnAssetOnActor2(const UObject* WorldContextObject, UglTFRuntimeAsset* Asset, AActor* Actor, const FTransform& RelativeTransform,
+	const FglTFRuntimeStaticMeshConfig& StaticMeshConfig,
+	const FglTFRuntimeSkeletalMeshConfig& SkeletalMeshConfig,
+	const FglTFRuntimeSkeletalAnimationConfig& SkeletalAnimationConfig,
+	TFunction<void(AglTFRuntimeAssetActor*)> PreSpawnConfiguration)
+{
+	if (ensure(WorldContextObject && Asset))
+	{
+		auto World = WorldContextObject->GetWorld();
+		if (ensure(World))
+		{
+			auto TempActor = World->SpawnActorDeferred<AglTFRuntimeAssetActor>(AglTFRuntimeAssetActor::StaticClass(), FTransform::Identity, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+			TempActor->Asset = Asset;
+			if (!Actor)
+			{
+				Actor = TempActor;
+			}
+
+			if (RelativeTransform.Equals(FTransform::Identity))
+			{
+				TempActor->DelegateRootComponent = Actor->GetRootComponent();
+			}
+			else
+			{
+				auto SceneComponent = NewObject<USceneComponent>(Actor);
+				SceneComponent->SetupAttachment(Actor->GetRootComponent());
+				SceneComponent->SetRelativeTransform(RelativeTransform);
+				SceneComponent->RegisterComponent();
+				Actor->AddInstanceComponent(SceneComponent);
+				TempActor->DelegateRootComponent = SceneComponent;
+			}
+			TempActor->StaticMeshConfig = StaticMeshConfig;
+			TempActor->SkeletalMeshConfig = SkeletalMeshConfig;
+			TempActor->SkeletalAnimationConfig = SkeletalAnimationConfig;
+			if (PreSpawnConfiguration)
+			{
+				PreSpawnConfiguration(TempActor);
+			}
+			TempActor->FinishSpawning(FTransform::Identity);
+
+			if (Actor != TempActor)
+			{
+				TempActor->SetLifeSpan(0.1f);
+			}
+
+			return Actor;
+		}
+	}
+	return nullptr;
+}
+#endif
