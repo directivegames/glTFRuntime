@@ -2133,7 +2133,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 		}
 		else
 		{
+#if 1 // WITH_DIRECTIVE
+			Pair.Value.PosKeys.RemoveAt(NumFrames, Pair.Value.PosKeys.Num() - NumFrames);
+#else
 			Pair.Value.PosKeys.RemoveAt(NumFrames, Pair.Value.PosKeys.Num() - NumFrames, true);
+#endif
 		}
 
 		// rotations
@@ -2163,7 +2167,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 		}
 		else
 		{
+#if 1 // WITH_DIRECTIVE
+			Pair.Value.RotKeys.RemoveAt(NumFrames, Pair.Value.RotKeys.Num() - NumFrames);
+#else
 			Pair.Value.RotKeys.RemoveAt(NumFrames, Pair.Value.RotKeys.Num() - NumFrames, true);
+#endif
 		}
 
 		if (Pair.Value.ScaleKeys.Num() == 0)
@@ -2192,7 +2200,11 @@ UAnimSequence* FglTFRuntimeParser::LoadSkeletalAnimationFromTracksAndMorphTarget
 		}
 		else
 		{
+#if 1 // WITH_DIRECTIVE
+			Pair.Value.ScaleKeys.RemoveAt(NumFrames, Pair.Value.ScaleKeys.Num() - NumFrames);
+#else
 			Pair.Value.ScaleKeys.RemoveAt(NumFrames, Pair.Value.ScaleKeys.Num() - NumFrames, true);
+#endif
 		}
 
 
