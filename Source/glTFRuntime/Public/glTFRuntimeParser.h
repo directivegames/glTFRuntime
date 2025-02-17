@@ -1421,7 +1421,7 @@ struct FglTFRuntimeSkeletalAnimationConfig
 	int32 RetargetSkinIndex;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "glTFRuntime")
-	UPoseAsset* PoseForRetargeting;
+	UPoseAsset* PoseForRetargeting = nullptr; // WITH_DIRECTIVE
 
 #if 1 // WITH_DIRECTIVE
 	// If specified, only the whitelisted animations will be loaded
