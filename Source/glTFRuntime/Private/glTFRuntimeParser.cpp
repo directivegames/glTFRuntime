@@ -133,7 +133,7 @@ TSharedPtr<FglTFRuntimeParser> FglTFRuntimeParser::FromRawDataAndArchive(const u
 
 		if (!LoaderConfig.bAsBlob && Filename.IsEmpty())
 		{
-			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Archive."), *Filename);
+			UE_LOG(LogGLTFRuntime, Error, TEXT("Unable to find entry point from Archive."));
 			return nullptr;
 		}
 

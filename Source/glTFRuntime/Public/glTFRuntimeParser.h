@@ -1083,7 +1083,7 @@ struct FglTFRuntimePhysicsBody
 		bSphereAutoCollision = false;
 		bBoxAutoCollision = false;
 		bCapsuleAutoCollision = false;
-		CollisionScale = 1.01;
+				CollisionScale = 1.01f;
 		bDisableCollision = false;
 	}
 };
@@ -1126,7 +1126,7 @@ struct FglTFRuntimePhysicsAssetAutoBodyConfig
 		CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
 		PhysicsType = EPhysicsType::PhysType_Default;
 		bConsiderForBounds = true;
-		CollisionScale = 1.01;
+				CollisionScale = 1.01f;
 	}
 };
 

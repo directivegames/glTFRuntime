@@ -367,7 +367,7 @@ USkeletalMesh* FglTFRuntimeParser::CreateSkeletalMeshFromLODs(TSharedRef<FglTFRu
 
 	SkeletalMeshContext->SkeletalMesh->NeverStream = true;
 
-	SkeletalMeshContext->SkeletalMesh->ResetLODInfo();
+	SkeletalMeshContext->SkeletalMesh->SetNumSourceModels(0);
 
 	const float TangentsDirection = SkeletalMeshContext->SkeletalMeshConfig.bReverseTangents ? -1 : 1;
 
@@ -2755,10 +2755,10 @@ UAnimSequence* FglTFRuntimeParser::CreateSkeletalAnimationFromPath(USkeletalMesh
 
 		for (const FName& KeyName : MorphTargetKeys)
 		{
-			if (JsonFrameObject->Values.Contains(KeyName.ToString()))
+			if (const TSharedPtr<FJsonValue> JsonValue = JsonFrameObject->TryGetField(KeyName.ToString()))
 			{
 				double Value = 0;
-				if (!JsonFrameObject->Values[KeyName.ToString()]->TryGetNumber(Value))
+				if (!JsonValue->TryGetNumber(Value))
 				{
 					Value = 0;
 				}
